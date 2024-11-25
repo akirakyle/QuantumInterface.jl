@@ -88,7 +88,6 @@ function wigner end
 include("bases.jl")
 include("abstract_types.jl")
 
-include("linalg.jl")
 include("tensor.jl")
 include("embed_permute.jl")
 include("expect_variance.jl")
