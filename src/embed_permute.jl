@@ -5,7 +5,7 @@
 `operators` is a dictionary `Dict{Vector{Int}, AbstractOperator}`. The integer vector
 specifies in which subsystems the corresponding operator is defined.
 """
-function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
+function embed(basis_l::TensorBasis, basis_r::TensorBasis,
                operators::Dict{<:Vector{<:Integer}, T}) where T<:AbstractOperator
     @assert length(basis_l.bases) == length(basis_r.bases)
     N = length(basis_l.bases)::Int # type assertion to help type inference
@@ -35,16 +35,16 @@ function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
         return permutesystems(op, perm)
     end
 end
-embed(basis_l::CompositeBasis, basis_r::CompositeBasis, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(basis_l, basis_r, Dict([i]=>op_i for (i, op_i) in operators); kwargs...)
-embed(basis::CompositeBasis, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(basis, basis, operators; kwargs...)
-embed(basis::CompositeBasis, operators::Dict{<:Vector{<:Integer}, T}; kwargs...) where {T<:AbstractOperator} = embed(basis, basis, operators; kwargs...)
+embed(basis_l::TensorBasis, basis_r::TensorBasis, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(basis_l, basis_r, Dict([i]=>op_i for (i, op_i) in operators); kwargs...)
+embed(basis::TensorBasis, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(basis, basis, operators; kwargs...)
+embed(basis::TensorBasis, operators::Dict{<:Vector{<:Integer}, T}; kwargs...) where {T<:AbstractOperator} = embed(basis, basis, operators; kwargs...)
 
 # The dictionary implementation works for non-DataOperators
-embed(basis_l::CompositeBasis, basis_r::CompositeBasis, indices, op::T) where T<:AbstractOperator = embed(basis_l, basis_r, Dict(indices=>op))
+embed(basis_l::TensorBasis, basis_r::TensorBasis, indices, op::T) where T<:AbstractOperator = embed(basis_l, basis_r, Dict(indices=>op))
 
-embed(basis_l::CompositeBasis, basis_r::CompositeBasis, index::Integer, op::AbstractOperator) = embed(basis_l, basis_r, index, [op])
-embed(basis::CompositeBasis, indices, operators::Vector{T}) where {T<:AbstractOperator} = embed(basis, basis, indices, operators)
-embed(basis::CompositeBasis, indices, op::AbstractOperator) = embed(basis, basis, indices, op)
+embed(basis_l::TensorBasis, basis_r::TensorBasis, index::Integer, op::AbstractOperator) = embed(basis_l, basis_r, index, [op])
+embed(basis::TensorBasis, indices, operators::Vector{T}) where {T<:AbstractOperator} = embed(basis, basis, indices, operators)
+embed(basis::TensorBasis, indices, op::AbstractOperator) = embed(basis, basis, indices, op)
 
 
 """
@@ -52,7 +52,7 @@ embed(basis::CompositeBasis, indices, op::AbstractOperator) = embed(basis, basis
 
 Tensor product of operators where missing indices are filled up with identity operators.
 """
-function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
+function embed(basis_l::TensorBasis, basis_r::TensorBasis,
                indices, operators::Vector{T}) where T<:AbstractOperator
 
     @assert check_embed_indices(indices)
@@ -87,6 +87,6 @@ permutesystems(a::AbstractOperator, perm) = arithmetic_unary_error("Permutations
 
 nsubsystems(s::AbstractKet) = nsubsystems(basis(s))
 nsubsystems(s::AbstractOperator) = nsubsystems(basis(s))
-nsubsystems(b::CompositeBasis) = length(b.bases)
+nsubsystems(b::TensorBasis) = length(b.bases)
 nsubsystems(b::Basis) = 1
 nsubsystems(::Nothing) = 1 # TODO Exists because of QuantumSavory; Consider removing this and reworking the functions that depend on it. E.g., a reason to have it when performing a project_traceout measurement on a state that contains only one subsystem
