@@ -35,8 +35,7 @@ Stores the subbases in a tuple. Instead of creating a TensorBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
 struct TensorBasis{T} <: Basis{T}
-    #TensorBasis(T) = new{typeassert(T, Tuple{Vararg{<:Basis}})}()
-    TensorBasis(B::Tuple{Vararg{<:Basis}}) = new{B}()
+    TensorBasis(x::Tuple{Vararg{Basis}}) = new{x}()
 end
 TensorBasis(bases::Basis...) = TensorBasis((bases...,))
 TensorBasis(bases::Vector) = TensorBasis((bases...,))
@@ -120,7 +119,7 @@ end
 Similar to [`TensorBasis`](@ref) but for the [`directsum`](@ref) (⊕)
 """
 struct SumBasis{T} <: Basis{T}
-    SumBasis(B::Tuple{Vararg{<:Basis}}) = new{B}()
+    SumBasis(x::Tuple{Vararg{Basis}}) = new{x}()
 end
 SumBasis(bases::Basis...) = SumBasis((bases...,))
 SumBasis(bases::Vector) = SumBasis((bases...,))
@@ -152,7 +151,7 @@ embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
 Basis for a system consisting of N states.
 """
 struct NLevelBasis{T} <: Basis{T}
-    function NLevelBasis(N::T) where {T}
+    function NLevelBasis(N::Integer)
         if N < 1
             throw(DimensionMismatch())
         end
@@ -171,7 +170,7 @@ e.g. `SpinBasis(3//2)`. The Pauli operators are defined for all possible
 spin numbers.
 """
 struct SpinBasis{T} <: Basis{T}
-    function SpinBasis(spinnumber::T) where {T<:Rational}
+    function SpinBasis(spinnumber::Rational)
         n = numerator(spinnumber)
         d = denominator(spinnumber)
         if !(d==2 || d==1) || n < 0
@@ -201,8 +200,8 @@ Base.length(b::PauliBasis{N}) where {N} = 4^N
 A basis describing a subspace embedded a higher dimensional Hilbert space.
 """
 struct SubspaceBasis{T} <: Basis{T}
-    basisstates::Vector{<:AbstractKet}
-    function SubspaceBasis(superbasis::B, basisstates::Vector{T}) where {B<:Basis,T<:AbstractKet}
+    basisstates
+    function SubspaceBasis(superbasis::Basis, basisstates::Vector{<:AbstractKet})
         for state = basisstates
             if basis(state) != superbasis
                 throw(ArgumentError("The basis of the basisstates has to be the superbasis."))
@@ -212,7 +211,7 @@ struct SubspaceBasis{T} <: Basis{T}
         new{(superbasis,H)}(basisstates)
     end
 end
-SubspaceBasis(basisstates::Vector{T}) where T = SubspaceBasis(basis(basisstates[1]), basisstates)
+SubspaceBasis(basisstates::Vector) = SubspaceBasis(basis(basisstates[1]), basisstates)
 Base.length(b::SubspaceBasis{N}) where {N} = length(b.basisstates)
 
 """
@@ -226,7 +225,7 @@ many-body bases are equal.
 """
 struct ManyBodyBasis{T} <: Basis{T}
     occupations
-    ManyBodyBasis(onebodybasis::B, occupations::O) where {B<:Basis,O} =
+    ManyBodyBasis(onebodybasis::Basis, occupations) =
         new{(onebodybasis, hash(hash.(occupations)))}(occupations)
 end
 
@@ -247,7 +246,7 @@ with energies periodic in the charge offset `n_g`.
 See e.g. https://arxiv.org/abs/2005.12667.
 """
 struct ChargeBasis{T} <: Basis{T}
-    function ChargeBasis(ncut::T) where {T}
+    function ChargeBasis(ncut::Integer)
         if ncut < 0
             throw(DimensionMismatch())
         end
@@ -262,7 +261,7 @@ Base.length(b::ChargeBasis{ncut}) where {ncut} = 2*ncut + 1
 Basis spanning `nmin, ..., nmax` charge states. See [`ChargeBasis`](@ref).
 """
 struct ShiftedChargeBasis{T} <: Basis{T}
-    function ShiftedChargeBasis(nmin::T, nmax::T) where {T}
+    function ShiftedChargeBasis(nmin::T, nmax::T) where {T<:Integer}
         if nmax <= nmin
             throw(DimensionMismatch())
         end
@@ -292,7 +291,7 @@ included fock state is. Similarly, the `offset` defines the lowest included
 fock state (default is 0). Note that the dimension of this basis is `N+1-offset`.
 """
 struct FockBasis{T} <: InfFockBasis{T}
-    function FockBasis(N, offset=0)
+    function FockBasis(N::T, offset::T=0) where {T<:Integer}
         if N < 0 || offset < 0 || N <= offset
             throw(DimensionMismatch())
         end
