@@ -1,21 +1,3 @@
-"""
-    Basis{T}
-
-Abstract type for all specialized bases.
-The `Basis` type is meant to specify a basis of the Hilbert space of the
-studied system. The type parameter must encode all relevant information to
-correctly distinguish equivlent/compatible bases as it is used in method dispatch.
-For example with an OperatorBasis, the left and right bases are compatible if
-and only if an instance is a subtype of OperatorBasis{B,B} where {B <: Basis}.
-
-Furthermore all subtypes must implement `Base.length` which returns the dimension
-of the Hilbert space.
-
-Composite systems can be defined with help of the [`TensorBasis`](@ref) class.
-"""
-abstract type Basis{T} end
-Base.:(==)(b1::Basis{T}, b2::Basis{T}) where {T} = true
-Base.:(==)(b1::Basis, b2::Basis) = false
 
 # According to this I should use singleton type instances instead of types themselves
 # https://discourse.julialang.org/t/singleton-types-vs-instances-as-type-parameters/2802/3
@@ -29,49 +11,6 @@ Base.:(==)(b1::Basis, b2::Basis) = false
 # TensorBasis(bases...) = TensorBasis{Tuple{bases...}}
 # bases(b::Type{TensorBasis{T}}) where {T} = fieldtypes(T)
 # Base.length(b::Type{TensorBasis{T}}) where {T} = prod(length.(fieldtypes(T)))
-
-"""
-Parametric composite type for all operator bases.
-
-See [TODO: reference operators.md in docs]
-"""
-#abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
-struct OperatorBasis{BL<:Basis,BR<:Basis} end
-
-"""
-Parametric composite type for all superoperator bases.
-
-See [TODO: reference superoperators.md in docs]
-"""
-#abstract type SuperOperatorBasis{BL<:OperatorBasis,BR<:OperatorBasis} end
-struct SuperOperatorBasis{BL<:OperatorBasis,BR<:OperatorBasis} end
-
-"""
-Exception that should be raised for an illegal algebraic operation.
-"""
-mutable struct IncompatibleBases <: Exception end
-
-"""
-    length(b::Basis)
-
-Total dimension of the Hilbert space.
-"""
-function length end
-
-"""
-    basis(a)
-
-Return the basis of an object.
-
-
-Returns B where B<:Basis when typeof(a)<:StateVector.
-Returns B where B<:OperatorBasis when typeof(a)<:AbstractOperator.
-Returns B where B<:SuperOperatorBasis for typeof(a)<:AbstractSuperOperator.
-"""
-function basis end
-#basis(sv::StateVector{B}) where {B} = B
-#basis(op::AbstractOperator{OperatorBasis{B,B}}) where {B} = B
-#basis(op::AbstractSuperOperator{SuperOperatorBasis{OperatorBasis{B,B}, OperatorBasis{B,B}}}) where {B} = B
 
 """
     GenericBasis(N)
@@ -96,7 +35,8 @@ Stores the subbases in a tuple. Instead of creating a TensorBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
 struct TensorBasis{T} <: Basis{T}
-    TensorBasis(T) = new{typeassert(T, Tuple{Vararg{<:Basis}})}()
+    #TensorBasis(T) = new{typeassert(T, Tuple{Vararg{<:Basis}})}()
+    TensorBasis(B::Tuple{Vararg{<:Basis}}) = new{B}()
 end
 TensorBasis(bases::Basis...) = TensorBasis((bases...,))
 TensorBasis(bases::Vector) = TensorBasis((bases...,))
@@ -174,29 +114,37 @@ function permutesystems(b::TensorBasis, perm)
     TensorBasis(bases(b)[perm])
 end
 
-
-##
-# Common bases
-##
-
 """
-    FockBasis(N,offset=0)
+    SumBasis(b1, b2...)
 
-Basis for a Fock space where `N` specifies a cutoff, i.e. what the highest
-included fock state is. Similarly, the `offset` defines the lowest included
-fock state (default is 0). Note that the dimension of this basis is `N+1-offset`.
+Similar to [`TensorBasis`](@ref) but for the [`directsum`](@ref) (⊕)
 """
-struct FockBasis{T} <: Basis{T}
-    function FockBasis(N, offset=0)
-        if N < 0 || offset < 0 || N <= offset
-            throw(DimensionMismatch())
-        end
-        new{(N,offset)}()
-    end
+struct SumBasis{T} <: Basis{T}
+    SumBasis(B::Tuple{Vararg{<:Basis}}) = new{B}()
 end
-cutoff(b::FockBasis{T}) where {T} = T[1]
-offset(b::FockBasis{T}) where {T} = T[2]
-Base.length(b::FockBasis{T}) where {T} = T[1] - T[2] + 1
+SumBasis(bases::Basis...) = SumBasis((bases...,))
+SumBasis(bases::Vector) = SumBasis((bases...,))
+bases(b::SumBasis{T}) where {T} = T
+Base.length(b::SumBasis{T}) where {T} = sum(length.(T))
+
+"""
+    directsum(b1::Basis, b2::Basis)
+
+Construct the [`SumBasis`](@ref) out of two sub-bases.
+"""
+directsum(b::Basis) = TensorBasis(b)
+directsum(b1::Basis, b2::Basis) = TensorBasis(b1, b2)
+directsum(b1::SumBasis, b2::SumBasis) = TensorBasis(bases(b1)..., bases(b1)...)
+directsum(b1::SumBasis, b2::Basis) = TensorBasis(bases(b1)..., b2)
+directsum(b1::Basis, b2::SumBasis) = TensorBasis(b1, bases(b2)...)
+directsum(bases::Basis...) = reduce(dicectsum, bases)
+
+embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
+
+
+##
+# Common finite bases
+##
 
 """
     NLevelBasis(N)
@@ -211,7 +159,7 @@ struct NLevelBasis{T} <: Basis{T}
         new{N}()
     end
 end
-Base.length(b::NLevelBasis{T}) where {T} = T
+Base.length(b::NLevelBasis{N}) where {N} = N
 
 """
     SpinBasis(n)
@@ -247,33 +195,167 @@ struct PauliBasis{T} <: Basis{T}
 end
 Base.length(b::PauliBasis{N}) where {N} = 4^N
 
-
 """
-    SumBasis(b1, b2...)
+    SubspaceBasis(basisstates)
 
-Similar to [`TensorBasis`](@ref) but for the [`directsum`](@ref) (⊕)
+A basis describing a subspace embedded a higher dimensional Hilbert space.
 """
-struct SumBasis{T} <: Basis{T}
-    TensorBasis(T) = new{typeassert(T, Tuple{Vararg{<:Basis}})}()
+struct SubspaceBasis{T} <: Basis{T}
+    basisstates::Vector{<:AbstractKet}
+    function SubspaceBasis(superbasis::B, basisstates::Vector{T}) where {B<:Basis,T<:AbstractKet}
+        for state = basisstates
+            if basis(state) != superbasis
+                throw(ArgumentError("The basis of the basisstates has to be the superbasis."))
+            end
+        end
+        H = hash([hash(x) for x=basisstates])
+        new{(superbasis,H)}(basisstates)
+    end
 end
-SumBasis(bases::Basis...) = SumBasis((bases...,))
-SumBasis(bases::Vector) = SumBasis((bases...,))
-bases(b::SumBasis{T}) where {T} = T
-Base.length(b::SumBasis{T}) where {T} = sum(length.(T))
+SubspaceBasis(basisstates::Vector{T}) where T = SubspaceBasis(basis(basisstates[1]), basisstates)
+Base.length(b::SubspaceBasis{N}) where {N} = length(b.basisstates)
 
 """
-    directsum(b1::Basis, b2::Basis)
+    ManyBodyBasis(b, occupations)
 
-Construct the [`SumBasis`](@ref) out of two sub-bases.
+Basis for a many body system.
+
+The basis has to know the associated one-body basis `b` and which occupation states
+should be included. The occupations_hash is used to speed up checking if two
+many-body bases are equal.
 """
-directsum(b::Basis) = TensorBasis(b)
-directsum(b1::Basis, b2::Basis) = TensorBasis(b1, b2)
-directsum(b1::SumBasis, b2::SumBasis) = TensorBasis(bases(b1)..., bases(b1)...)
-directsum(b1::SumBasis, b2::Basis) = TensorBasis(bases(b1)..., b2)
-directsum(b1::Basis, b2::SumBasis) = TensorBasis(b1, bases(b2)...)
-directsum(bases::Basis...) = reduce(dicectsum, bases)
+struct ManyBodyBasis{T} <: Basis{T}
+    occupations
+    ManyBodyBasis(onebodybasis::B, occupations::O) where {B<:Basis,O} =
+        new{(onebodybasis, hash(hash.(occupations)))}(occupations)
+end
 
-embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
+"""
+    ChargeBasis(ncut) <: Basis
+
+Basis spanning `-ncut, ..., ncut` charge states, which are the fourier modes
+(irreducible representations) of a continuous U(1) degree of freedom, truncated
+at `ncut`.
+
+The charge basis is a natural representation for circuit-QED elements such as
+the "transmon", which has a hamiltonian of the form
+```julia
+b = ChargeBasis(ncut)
+H = 4E_C * (n_g * identityoperator(b) + chargeop(b))^2 - E_J * cosφ(b)
+```
+with energies periodic in the charge offset `n_g`.
+See e.g. https://arxiv.org/abs/2005.12667.
+"""
+struct ChargeBasis{T} <: Basis{T}
+    function ChargeBasis(ncut::T) where {T}
+        if ncut < 0
+            throw(DimensionMismatch())
+        end
+        new{ncut}()
+    end
+end
+Base.length(b::ChargeBasis{ncut}) where {ncut} = 2*ncut + 1
+
+"""
+    ShiftedChargeBasis(nmin, nmax) <: Basis
+
+Basis spanning `nmin, ..., nmax` charge states. See [`ChargeBasis`](@ref).
+"""
+struct ShiftedChargeBasis{T} <: Basis{T}
+    function ShiftedChargeBasis(nmin::T, nmax::T) where {T}
+        if nmax <= nmin
+            throw(DimensionMismatch())
+        end
+        new{(nmin, nmax)}
+    end
+end
+Base.length(b::ShiftedChargeBasis{N}) where {N} = N[2] - N[1] + 1
+
+
+##
+# Common infinite bases along with finite cutoff versions
+##
+
+abstract type ParticleBasis{T} <: Basis{T} end
+Base.length(::Type{ParticleBasis}) = Inf
+
+abstract type InfFockBasis{T} <: ParticleBasis{T} end
+abstract type InfCoherentStateBasis{T} <: ParticleBasis{T} end
+abstract type InfPositionBasis{T} <: ParticleBasis{T} end
+abstract type InfMomentumBasis{T} <: ParticleBasis{T} end
+
+"""
+    FockBasis(N,offset=0)
+
+Basis for a Fock space where `N` specifies a cutoff, i.e. what the highest
+included fock state is. Similarly, the `offset` defines the lowest included
+fock state (default is 0). Note that the dimension of this basis is `N+1-offset`.
+"""
+struct FockBasis{T} <: InfFockBasis{T}
+    function FockBasis(N, offset=0)
+        if N < 0 || offset < 0 || N <= offset
+            throw(DimensionMismatch())
+        end
+        new{(N,offset)}()
+    end
+end
+cutoff(b::FockBasis{T}) where {T} = T[1]
+offset(b::FockBasis{T}) where {T} = T[2]
+Base.length(b::FockBasis{T}) where {T} = T[1] - T[2] + 1
+
+"""
+    PositionBasis(xmin, xmax, Npoints)
+    PositionBasis(b::MomentumBasis)
+
+Basis for a particle in real space.
+
+For simplicity periodic boundaries are assumed which means that
+the rightmost point defined by `xmax` is not included in the basis
+but is defined to be the same as `xmin`.
+
+When a [`MomentumBasis`](@ref) is given as argument the exact values
+of ``x_{min}`` and ``x_{max}`` are due to the periodic boundary conditions
+more or less arbitrary and are chosen to be
+``-\\pi/dp`` and ``\\pi/dp`` with ``dp=(p_{max}-p_{min})/N``.
+"""
+struct PositionBasis{T} <: InfPositionBasis{T}
+    PositionBasis(xmin::F, xmax::F, N::T) where {F<:Real,T<:Integer} =
+        new{(xmin, xmax, N)}()
+end
+function PositionBasis(xmin::F1, xmax::F2, N) where {F1,F2}
+    F = promote_type(F1,F2)
+    return PositionBasis(convert(F,xmin), convert(F,xmax), N)
+end
+Base.length(b::PositionBasis{T}) where {T} = T[3]
+
+"""
+    MomentumBasis(pmin, pmax, Npoints)
+    MomentumBasis(b::PositionBasis)
+
+Basis for a particle in momentum space.
+
+For simplicity periodic boundaries are assumed which means that
+`pmax` is not included in the basis but is defined to be the same as `pmin`.
+
+When a [`PositionBasis`](@ref) is given as argument the exact values
+of ``p_{min}`` and ``p_{max}`` are due to the periodic boundary conditions
+more or less arbitrary and are chosen to be
+``-\\pi/dx`` and ``\\pi/dx`` with ``dx=(x_{max}-x_{min})/N``.
+"""
+struct MomentumBasis{T} <: InfMomentumBasis{T}
+    MomentumBasis(pmin::F, pmax::F, N::T) where {F<:Real, T<:Integer} =
+        new{(pmin, pmax, N)}()
+end
+function MomentumBasis(pmin::F1, pmax::F2, N) where {F1,F2}
+    F = promote_type(F1,F2)
+    return MomentumBasis(convert(F,pmin), convert(F,pmax), N)
+end
+Base.length(b::MomentumBasis{T}) where {T} = T[3]
+
+# FIXME
+PositionBasis(b::MomentumBasis) = (dp = (b.pmax - b.pmin)/b.N; PositionBasis(-pi/dp, pi/dp, b.N))
+MomentumBasis(b::PositionBasis) = (dx = (b.xmax - b.xmin)/b.N; MomentumBasis(-pi/dx, pi/dx, b.N))
+
 
 ##
 # show methods

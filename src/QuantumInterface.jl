@@ -5,6 +5,28 @@ import LinearAlgebra: tr, ishermitian, norm, normalize, normalize!
 import Base: show, summary
 import SparseArrays: sparse, spzeros, AbstractSparseMatrix # TODO move to an extension
 
+"""
+    length(b::Basis)
+
+Total dimension of the Hilbert space.
+"""
+function length end
+
+"""
+    basis(a)
+
+Return the basis of an object.
+
+
+Returns B where B<:Basis when typeof(a)<:StateVector.
+Returns B where B<:OperatorBasis when typeof(a)<:AbstractOperator.
+Returns B where B<:SuperOperatorBasis for typeof(a)<:AbstractSuperOperator.
+"""
+function basis end
+#basis(sv::StateVector{B}) where {B} = B
+#basis(op::AbstractOperator{OperatorBasis{B,B}}) where {B} = B
+#basis(op::AbstractSuperOperator{SuperOperatorBasis{OperatorBasis{B,B}, OperatorBasis{B,B}}}) where {B} = B
+
 function apply! end
 
 function dagger end
@@ -86,8 +108,8 @@ function squeeze end
 function wigner end
 
 
-include("bases.jl")
 include("abstract_types.jl")
+include("bases.jl")
 
 include("linalg.jl")
 include("tensor.jl")
