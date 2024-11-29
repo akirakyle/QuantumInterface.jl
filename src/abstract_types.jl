@@ -79,21 +79,3 @@ See [TODO: reference superoperators.md in docs]
 ```
 """
 abstract type AbstractSuperOperator{B<:SuperOperatorBasis} end
-
-function summary(stream::IO, x::AbstractOperator)
-    b = fullbasis(x)
-    print(stream, "$(typeof(x).name.name)(dim=$(length(b.left))x$(length(b.right)))\n")
-    if samebases(b)
-        print(stream, "  basis: ")
-        show(stream, basis(b))
-    else
-        print(stream, "  basis left:  ")
-        show(stream, b.left)
-        print(stream, "\n  basis right: ")
-        show(stream, b.right)
-    end
-end
-
-show(stream::IO, x::AbstractOperator) = summary(stream, x)
-
-traceout!(s::StateVector, i) = ptrace(s,i)

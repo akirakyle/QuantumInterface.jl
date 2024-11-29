@@ -1,10 +1,5 @@
 module QuantumInterface
 
-import Base: ==, +, -, *, /, ^, length, one, exp, conj, conj!, transpose, copy
-import LinearAlgebra: tr, ishermitian, norm, normalize, normalize!
-import Base: show, summary
-import SparseArrays: sparse, spzeros, AbstractSparseMatrix # TODO move to an extension
-
 """
     length(b::Basis)
 
@@ -70,6 +65,7 @@ tensor() = throw(ArgumentError("Tensor function needs at least one argument."))
 function tensor_pow end # TODO should Base.^ be the same as tensor_pow?
 
 function traceout! end
+traceout!(s::StateVector, i) = ptrace(s,i)
 
 function variance end
 
@@ -120,6 +116,8 @@ include("identityoperator.jl")
 include("julia_base.jl")
 include("julia_linalg.jl")
 include("sparse.jl")
+
+include("show.jl")
 
 include("sortedindices.jl")
 
