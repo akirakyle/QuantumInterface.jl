@@ -65,7 +65,6 @@ tensor() = throw(ArgumentError("Tensor function needs at least one argument."))
 function tensor_pow end # TODO should Base.^ be the same as tensor_pow?
 
 function traceout! end
-traceout!(s::StateVector, i) = ptrace(s,i)
 
 function variance end
 
@@ -120,5 +119,8 @@ include("sparse.jl")
 include("show.jl")
 
 include("sortedindices.jl")
+
+# TODO put me in the right place...
+traceout!(s::StateVector, i) = ptrace(s,i)
 
 end # module

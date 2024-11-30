@@ -13,8 +13,10 @@ of the Hilbert space.
 
 Composite systems can be defined with help of the [`TensorBasis`](@ref) class.
 """
-abstract type Basis{T} end
-Base.:(==)(b1::Basis{T}, b2::Basis{T}) where {T} = true
+abstract type Basis end
+#Base.:(==)(b1::Basis{T}, b2::Basis{T}) where {T} = true
+#Base.:(==)(b1::Basis, b2::Basis) = false
+Base.:(==)(b1::T, b2::T) where {T<:Basis} = true
 Base.:(==)(b1::Basis, b2::Basis) = false
 
 """
@@ -23,15 +25,19 @@ Parametric composite type for all operator bases.
 See [TODO: reference operators.md in docs]
 """
 #abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
-struct OperatorBasis{BL<:Basis,BR<:Basis} end
+#struct OperatorBasis{BL<:Basis,BR<:Basis} end
+abstract type OperatorBasis end
+Base.:(==)(b1::T, b2::T) where {T<:OperatorBasis} = true
+Base.:(==)(b1::OperatorBasis, b2::OperatorBasis) = false
 
 """
 Parametric composite type for all superoperator bases.
 
 See [TODO: reference superoperators.md in docs]
 """
-#abstract type SuperOperatorBasis{BL<:OperatorBasis,BR<:OperatorBasis} end
-struct SuperOperatorBasis{BL<:OperatorBasis,BR<:OperatorBasis} end
+abstract type SuperOperatorBasis end
+Base.:(==)(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
+Base.:(==)(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
 
 """
 Exception that should be raised for an illegal algebraic operation.
