@@ -21,10 +21,10 @@ Should only be used rarely since it defeats the purpose of checking that the
 bases of state vectors and operators are correct for algebraic operations.
 The preferred way is to specify special bases for different systems.
 """
-struct GenericBasis{T} <: Basis
-    GenericBasis(T) = new{T}()
+struct GenericBasis{N} <: Basis{N}
+    # Note no type checknig here so this can be abused to put anything that's isbits in
+    GenericBasis(N) = new{N}()
 end
-Base.length(b::GenericBasis{N}) where {N} = N
 
 """
     TensorBasis(b1, b2...)
@@ -34,13 +34,12 @@ Basis for composite Hilbert spaces.
 Stores the subbases in a tuple. Instead of creating a TensorBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
-struct TensorBasis{T<:Tuple{Vararg{Basis}}} <: Basis
+struct TensorBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
     bases
-    TensorBasis(x) = new{typeof(x)}(x)
+    TensorBasis(x) = new{prod(length.(x)), typeof(x)}(x)
 end
 TensorBasis(bases::Basis...) = TensorBasis((bases...,))
 TensorBasis(bases::Vector) = TensorBasis((bases...,))
-Base.length(b::TensorBasis) = prod(length.(b.bases))
 
 """
     tensor(x::Basis, y::Basis, z::Basis...)
@@ -118,13 +117,12 @@ end
 
 Similar to [`TensorBasis`](@ref) but for the [`directsum`](@ref) (⊕)
 """
-struct SumBasis{T<:Tuple{Vararg{Basis}}} <: Basis
+struct SumBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
     bases
-    SumBasis(x) = new{typeof(x)}(x)
+    SumBasis(x) = new{sum(length.(x)), typeof(x)}(x)
 end
 SumBasis(bases::Basis...) = SumBasis((bases...,))
 SumBasis(bases::Vector) = SumBasis((bases...,))
-Base.length(b::SumBasis{T}) where {T} = sum(length.(b.bases))
 
 """
     directsum(b1::Basis, b2::Basis)
@@ -150,7 +148,7 @@ embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
 
 Basis for a system consisting of N states.
 """
-struct NLevelBasis{T} <: Basis
+struct NLevelBasis{N} <: Basis{N}
     function NLevelBasis(N::Integer)
         if N < 1
             throw(DimensionMismatch())
@@ -158,7 +156,6 @@ struct NLevelBasis{T} <: Basis
         new{N}()
     end
 end
-Base.length(b::NLevelBasis{N}) where {N} = N
 
 """
     SpinBasis(n)
@@ -169,26 +166,25 @@ The basis can be created for arbitrary spinnumbers by using a rational number,
 e.g. `SpinBasis(3//2)`. The Pauli operators are defined for all possible
 spin numbers.
 """
-struct SpinBasis{T} <: Basis
+struct SpinBasis{N,T} <: Basis{N}
     function SpinBasis(spinnumber::Rational)
         n = numerator(spinnumber)
         d = denominator(spinnumber)
         if !(d==2 || d==1) || n < 0
             throw(DimensionMismatch())
         end
-        new{spinnumber}()
+        new{numerator(spinnumber*2 + 1), spinnumber}()
     end
 end
 SpinBasis(spinnumber) = SpinBasis(convert(Rational{Int}, spinnumber))
-spinnumber(b::SpinBasis{T}) where {T} = T
-Base.length(b::SpinBasis{T}) where {T} = numerator(T*2 + 1)
+spinnumber(b::SpinBasis{N,T}) where {N,T} = T
 
 """
     SubspaceBasis(basisstates)
 
 A basis describing a subspace embedded a higher dimensional Hilbert space.
 """
-struct SubspaceBasis{B, H} <: Basis
+struct SubspaceBasis{N,B,H} <: Basis{N}
     basisstates
     function SubspaceBasis(superbasis::Basis, basisstates::Vector{<:AbstractKet})
         for state = basisstates
@@ -197,11 +193,10 @@ struct SubspaceBasis{B, H} <: Basis
             end
         end
         H = hash([hash(x) for x=basisstates])
-        new{superbasis, H}(basisstates)
+        new{length(basisstates), superbasis, H}(basisstates)
     end
 end
 SubspaceBasis(basisstates::Vector) = SubspaceBasis(basis(basisstates[1]), basisstates)
-Base.length(b::SubspaceBasis{N}) where {N} = length(b.basisstates)
 
 """
     ManyBodyBasis(b, occupations)
@@ -212,10 +207,10 @@ The basis has to know the associated one-body basis `b` and which occupation sta
 should be included. The occupations_hash is used to speed up checking if two
 many-body bases are equal.
 """
-struct ManyBodyBasis{B,H} <: Basis
+struct ManyBodyBasis{N,B,H} <: Basis{N}
     occupations
     ManyBodyBasis(onebodybasis::Basis, occupations) =
-        new{onebodybasis, hash(hash.(occupations))}(occupations)
+        new{length(occupations), onebodybasis, hash(hash.(occupations))}(occupations)
 end
 
 """
@@ -234,41 +229,33 @@ H = 4E_C * (n_g * identityoperator(b) + chargeop(b))^2 - E_J * cosφ(b)
 with energies periodic in the charge offset `n_g`.
 See e.g. https://arxiv.org/abs/2005.12667.
 """
-struct ChargeBasis{T} <: Basis
+struct ChargeBasis{N,T} <: Basis{N}
     function ChargeBasis(ncut::Integer)
         if ncut < 0
             throw(DimensionMismatch())
         end
-        new{ncut}()
+        new{n2*ncut + 1, cut}()
     end
 end
-Base.length(b::ChargeBasis{ncut}) where {ncut} = 2*ncut + 1
 
 """
     ShiftedChargeBasis(nmin, nmax) <: Basis
 
 Basis spanning `nmin, ..., nmax` charge states. See [`ChargeBasis`](@ref).
 """
-struct ShiftedChargeBasis{T,N} <: Basis
+struct ShiftedChargeBasis{N,T,S} <: Basis{N}
     function ShiftedChargeBasis(nmin::T, nmax::T) where {T<:Integer}
         if nmax <= nmin
             throw(DimensionMismatch())
         end
-        new{nmin,nmax}()
+        new{nmax-nmin+1,nmin,nmax}()
     end
 end
-Base.length(b::ShiftedChargeBasis{N}) where {N} = N[2] - N[1] + 1
 
 
 ##
-# Common infinite bases along with finite cutoff versions
+# Common infinite bases
 ##
-
-abstract type ParticleBasis <: Basis end
-abstract type InfFockBasis <: ParticleBasis end
-abstract type InfCoherentStateBasis <: ParticleBasis end
-abstract type InfPositionBasis <: ParticleBasis end
-abstract type InfMomentumBasis <: ParticleBasis end
 
 """
     FockBasis(N,offset=0)
@@ -277,17 +264,19 @@ Basis for a Fock space where `N` specifies a cutoff, i.e. what the highest
 included fock state is. Similarly, the `offset` defines the lowest included
 fock state (default is 0). Note that the dimension of this basis is `N+1-offset`.
 """
-struct FockBasis{N,offset} <: InfFockBasis
-    function FockBasis(N::T, offset::T=0) where {T<:Integer}
-        if N < 0 || offset < 0 || N <= offset
+struct FockBasis{N,cutoff,offset} <: Basis{N}
+    function FockBasis(cutoff::Number, offset::Number=0)
+        if isinf(cutoff)
+            return new{Inf,Inf,0}()
+        end
+        if cutoff < 0 || offset < 0 || cutoff <= offset
             throw(DimensionMismatch())
         end
-        new{N,offset}()
+        new{cutoff-offset+1, cutoff, offset}()
     end
 end
-cutoff(b::FockBasis{N,O}) where {N,O} = N
-offset(b::FockBasis{N,O}) where {N,O} = O
-Base.length(b::FockBasis{N,O}) where {N,O} = N - O + 1
+cutoff(b::FockBasis{N,C,O}) where {N,C,O} = C
+offset(b::FockBasis{N,C,O}) where {N,C,O} = O
 
 """
     PositionBasis(xmin, xmax, Npoints)
@@ -304,15 +293,14 @@ of ``x_{min}`` and ``x_{max}`` are due to the periodic boundary conditions
 more or less arbitrary and are chosen to be
 ``-\\pi/dp`` and ``\\pi/dp`` with ``dp=(p_{max}-p_{min})/N``.
 """
-struct PositionBasis{xmin,xmax,N} <: InfPositionBasis
-    PositionBasis(xmin::F, xmax::F, N::T) where {F<:Real,T<:Integer} =
-        new{xmin,xmax,N}()
+struct PositionBasis{N,xmin,xmax} <: Basis{N}
+    PositionBasis(N::Number, xmin::F, xmax::F) where {F<:Real} =
+        isinf(N) ? new{-Inf,Inf,Inf}() : new{xmin,xmax,N}()
 end
 function PositionBasis(xmin::F1, xmax::F2, N) where {F1,F2}
     F = promote_type(F1,F2)
-    return PositionBasis(convert(F,xmin), convert(F,xmax), N)
+    return PositionBasis(N, convert(F,xmin), convert(F,xmax))
 end
-Base.length(b::PositionBasis{xmin,xmax,N}) where {xmin,xmax,N} = N
 
 """
     MomentumBasis(pmin, pmax, Npoints)
@@ -328,15 +316,14 @@ of ``p_{min}`` and ``p_{max}`` are due to the periodic boundary conditions
 more or less arbitrary and are chosen to be
 ``-\\pi/dx`` and ``\\pi/dx`` with ``dx=(x_{max}-x_{min})/N``.
 """
-struct MomentumBasis{pmin,pmax,N} <: InfMomentumBasis
+struct MomentumBasis{N,pmin,pmax} <: Basis{N}
     MomentumBasis(pmin::F, pmax::F, N::T) where {F<:Real, T<:Integer} =
-        new{pmin,pmax,N}()
+        isinf(N) ? new{-Inf,Inf,Inf}() : new{pmin,pmax,N}()
 end
-function MomentumBasis(pmin::F1, pmax::F2, N) where {F1,F2}
+function MomentumBasis(N, pmin::F1, pmax::F2) where {F1,F2}
     F = promote_type(F1,F2)
-    return MomentumBasis(convert(F,pmin), convert(F,pmax), N)
+    return MomentumBasis(N, convert(F,pmin), convert(F,pmax))
 end
-Base.length(b::MomentumBasis{pmin,pmax,N}) where {pmin,pmax,N} = N
 
 # FIXME
 PositionBasis(b::MomentumBasis) = (dp = (b.pmax - b.pmin)/b.N; PositionBasis(-pi/dp, pi/dp, b.N))

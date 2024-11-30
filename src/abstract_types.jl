@@ -1,5 +1,5 @@
 """
-    Basis{T}
+    Basis{N}
 
 Abstract type for all specialized bases.
 The `Basis` type is meant to specify a basis of the Hilbert space of the
@@ -12,12 +12,14 @@ Furthermore all subtypes must implement `Base.length` which returns the dimensio
 of the Hilbert space.
 
 Composite systems can be defined with help of the [`TensorBasis`](@ref) class.
+
+N represents the underlying hilbert space, charicterized by it's dimensionality
+Subtypes can add more type parameters as needed...
 """
-abstract type Basis end
-#Base.:(==)(b1::Basis{T}, b2::Basis{T}) where {T} = true
-#Base.:(==)(b1::Basis, b2::Basis) = false
+abstract type Basis{N} end
 Base.:(==)(b1::T, b2::T) where {T<:Basis} = true
 Base.:(==)(b1::Basis, b2::Basis) = false
+Base.length(b::Basis{N}) where {N} = N
 
 """
 Parametric composite type for all operator bases.
@@ -26,7 +28,7 @@ See [TODO: reference operators.md in docs]
 """
 #abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
 #struct OperatorBasis{BL<:Basis,BR<:Basis} end
-abstract type OperatorBasis end
+abstract type OperatorBasis{N,N} end
 Base.:(==)(b1::T, b2::T) where {T<:OperatorBasis} = true
 Base.:(==)(b1::OperatorBasis, b2::OperatorBasis) = false
 
@@ -35,7 +37,7 @@ Parametric composite type for all superoperator bases.
 
 See [TODO: reference superoperators.md in docs]
 """
-abstract type SuperOperatorBasis end
+abstract type SuperOperatorBasis{N,N} end
 Base.:(==)(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
 Base.:(==)(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
 
