@@ -12,6 +12,10 @@
 # bases(b::Type{CompositeBasis{T}}) where {T} = fieldtypes(T)
 # Base.length(b::Type{CompositeBasis{T}}) where {T} = prod(length.(fieldtypes(T)))
 
+# TODO: create function interface to access all relevant fields of each basis so
+# that downstream code only uses funcitos and not fields...
+# see https://docs.julialang.org/en/v1/manual/style-guide/#Prefer-exported-methods-over-direct-field-access
+
 """
     GenericBasis(N)
 
@@ -349,11 +353,11 @@ Basis for composite Hilbert spaces.
 Stores the subbases in a tuple. Instead of creating a CompositeBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
-struct CompositeOperatorBasis{N,M,T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis{N,M}
+struct CompositeOperatorBasis{N,T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis{N}
     bases
     function CompositeBasis(x)
         N,M = reduce(((N1,M1), (N2,M2)) -> (N1*N2, M2*M2), x; init=(1,1))
-        new{N,M,typeof(x)}(x)
+        new{(N,M),typeof(x)}(x)
     end
 end
 CompositeOperatorBasis(bases::OperatorBasis...) = CompositeOperatorBasis((bases...,))
@@ -380,10 +384,10 @@ tensor(bases::OperatorBasis...) = reduce(tensor, bases)
 Typical "Ket-Bra" Basis.
 TODO: write more...
 """
-struct KetBraBasis{N,M,BL<:Basis, BR<:Basis} <: OperatorBasis{N,M}
+struct KetBraBasis{N,BL<:Basis,BR<:Basis} <: OperatorBasis{N}
     left::BL
     right::BR
-    KetBraBasis(bl, br) = new{length(bl), length(br), typeof(bl),typeof(br)}(bl,br)
+    KetBraBasis(bl, br) = new{(length(bl), length(br)), typeof(bl), typeof(br)}(bl, br)
 end
 
 tensor(b::KetBraBasis) = b # TODO is this right?
@@ -396,10 +400,10 @@ tensor(bases::KetBraBasis...) = reduce(tensor, bases)
 Unitary operator basis for a tensor product of modes number of dim_i-dimensional operator space in
 the clock-shift matrices.
 """
-struct HeisenbergWeylBasis{N,M,dims} <: UnitaryOperatorBasis{N,M}
+struct HeisenbergWeylBasis{N,dims} <: UnitaryOperatorBasis{N}
     dims
     HeisenbergWeylBasis(dims::Tuple{Integer}) =
-        new{prod(dims),prod(dims),dims}(dims)
+        new{(prod(dims),prod(dims)),dims}(dims)
     # TODO: add ordering? i.e. symplectic form
 end
 HeisenbergWeylBasis(modes::Integer, dim::Integer) = HeisenbergWeylBasis(ntuple(i->dim, modes))
@@ -412,14 +416,35 @@ tensor(bases::HeisenbergWeylBasis...) = reduce(tensor, bases)
     PauliBasis(num_qubits)
 
 Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
-The dimension of the basis is $2ᴺ \times 2ᴺ$.
+The dimension of the basis is 2ᴺ times 2ᴺ.
 """
-struct PauliBasis{N,M,modes} <: UnitaryOperatorBasis{N,M}
+struct PauliBasis{N,modes} <: UnitaryOperatorBasis{N}
     modes
-    PauliBasis(modes::Integer) = new{2^modes,2^modes,modes}(modse)
+    PauliBasis(modes::Integer) = new{(2^modes,2^modes),modes}(modse)
     # TODO: add ordering? i.e. symplectic form
 end
 
 tensor(b::PauliBasis) = b # TODO is this right?
 tensor(b1::PauliBasis, b2::PauliBasis) = PauliBasis(b1.modes+b2.modes)
 tensor(bases::PauliBasis...) = reduce(tensor, bases)
+
+##
+# Common super-operator bases
+##
+
+
+"""
+    KetKetBraBraBasis(BL,BR)
+
+Typical "KetKet-BraBra" SuperOperatorBasis.
+TODO: write more...
+"""
+struct KetKetBraBraBasis{N,BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBasis{N}
+    left::BL
+    right::BR
+    KetBraBasis(bl, br) = new{length(bl), length(br), typeof(bl), typeof(br)}(bl, br)
+end
+
+tensor(b::KetKetBraBraBasis) = b # TODO is this right?
+tensor(b1::KetKetBraBraBasis, b2::KetKetBraBraBasis) = KetKetBraBraBasis(b1.left⊗b2.left, b1.right⊗b2.right)
+tensor(bases::KetKetBraBraBasis...) = reduce(tensor, bases)

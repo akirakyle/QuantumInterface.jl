@@ -31,25 +31,29 @@ TODO: write this condition down explicitly.
 Examples include pauli or Heisenberg-Weyl bases as well as
 standard "ket-bra" basis
 
+N is two-tuple describing left and right hilbert space dimensions
+
 See [TODO: reference operators.md in docs]
 """
 #abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
 #struct OperatorBasis{BL<:Basis,BR<:Basis} end
-abstract type OperatorBasis{N,M} end
-abstract type UnitaryOperatorBasis{N,M} <: OperatorBasis{N,M} end
+abstract type OperatorBasis{N} end
+abstract type UnitaryOperatorBasis{N} <: OperatorBasis{N} end
 Base.:(==)(b1::T, b2::T) where {T<:OperatorBasis} = true
 Base.:(==)(b1::OperatorBasis, b2::OperatorBasis) = false
-Base.size(b::OperatorBasis{N,M}) where {N,M} = (N,M)
-Base.length(b::OperatorBasis{N,M}) where {N,M} = N*M
+Base.size(b::OperatorBasis{N}) where {N} = N
 
 """
 Parametric composite type for all superoperator bases.
 
+N is two-tuple of two-tuples describing left and right operator dimensions
+
 See [TODO: reference superoperators.md in docs]
 """
-abstract type SuperOperatorBasis{N,M} end
+abstract type SuperOperatorBasis{N} end
 Base.:(==)(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
 Base.:(==)(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
+Base.size(b::SuperOperatorBasis{N}) where {N} = N
 
 """
 Exception that should be raised for an illegal algebraic operation.
