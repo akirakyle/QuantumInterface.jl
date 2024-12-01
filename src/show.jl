@@ -25,7 +25,7 @@ function show(stream::IO, x::GenericBasis)
     end
 end
 
-function show(stream::IO, x::TensorBasis)
+function show(stream::IO, x::CompositeBasis)
     write(stream, "[")
     for i in 1:length(bases(x))
         show(stream, bases(x)[i])

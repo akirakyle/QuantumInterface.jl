@@ -5,12 +5,12 @@
 # abstract type GenericBasis{T} <: Basis{T} end
 # GenericBasis(T) = GenericBasis{T}
 # Base.length(b::Type{GenericBasis{N}}) where {N} = N
-# abstract type TensorBasis{T<:Tuple{Vararg{<:Basis}}} <: Basis{T} end
-# TensorBasis(bases::Tuple) = TensorBasis{Tuple{bases...}}
-# TensorBasis(bases::Vector) = TensorBasis{Tuple{bases...}}
-# TensorBasis(bases...) = TensorBasis{Tuple{bases...}}
-# bases(b::Type{TensorBasis{T}}) where {T} = fieldtypes(T)
-# Base.length(b::Type{TensorBasis{T}}) where {T} = prod(length.(fieldtypes(T)))
+# abstract type CompositeBasis{T<:Tuple{Vararg{<:Basis}}} <: Basis{T} end
+# CompositeBasis(bases::Tuple) = CompositeBasis{Tuple{bases...}}
+# CompositeBasis(bases::Vector) = CompositeBasis{Tuple{bases...}}
+# CompositeBasis(bases...) = CompositeBasis{Tuple{bases...}}
+# bases(b::Type{CompositeBasis{T}}) where {T} = fieldtypes(T)
+# Base.length(b::Type{CompositeBasis{T}}) where {T} = prod(length.(fieldtypes(T)))
 
 """
     GenericBasis(N)
@@ -27,33 +27,33 @@ struct GenericBasis{N} <: Basis{N}
 end
 
 """
-    TensorBasis(b1, b2...)
+    CompositeBasis(b1, b2...)
 
 Basis for composite Hilbert spaces.
 
-Stores the subbases in a tuple. Instead of creating a TensorBasis
+Stores the subbases in a tuple. Instead of creating a CompositeBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
-struct TensorBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
+struct CompositeBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
     bases
-    TensorBasis(x) = new{prod(length.(x)), typeof(x)}(x)
+    CompositeBasis(x) = new{prod(length.(x)), typeof(x)}(x)
 end
-TensorBasis(bases::Basis...) = TensorBasis((bases...,))
-TensorBasis(bases::Vector) = TensorBasis((bases...,))
+CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
+CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
 
 """
     tensor(x::Basis, y::Basis, z::Basis...)
 
-Create a [`TensorBasis`](@ref) from the given bases.
+Create a [`CompositeBasis`](@ref) from the given bases.
 
-Any given TensorBasis is expanded so that the resulting TensorBasis never
-contains another TensorBasis.
+Any given CompositeBasis is expanded so that the resulting CompositeBasis never
+contains another CompositeBasis.
 """
-tensor(b::Basis) = TensorBasis(b)
-tensor(b1::Basis, b2::Basis) = TensorBasis(b1, b2)
-tensor(b1::TensorBasis, b2::TensorBasis) = TensorBasis(b1.bases..., b1.bases...)
-tensor(b1::TensorBasis, b2::Basis) = TensorBasis(b1.bases..., b2)
-tensor(b1::Basis, b2::TensorBasis) = TensorBasis(b1, b2.bases...)
+tensor(b::Basis) = CompositeBasis(b)
+tensor(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
+tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(b1.bases..., b1.bases...)
+tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
+tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, b2.bases...)
 tensor(bases::Basis...) = reduce(tensor, bases)
 
 function Base.:^(b::Basis, N::Integer)
@@ -71,13 +71,13 @@ Reduced basis, state or operator on the specified subsystems.
 The `indices` argument, which can be a single integer or a vector of integers,
 specifies which subsystems are kept. At least one index must be specified.
 """
-function reduced(b::TensorBasis, indices)
+function reduced(b::CompositeBasis, indices)
     if length(indices)==0
         throw(ArgumentError("At least one subsystem must be specified in reduced."))
     elseif length(indices)==1
         return b.bases[indices[1]]
     else
-        return TensorBasis(b.bases[indices])
+        return CompositeBasis(b.bases[indices])
     end
 end
 
@@ -91,7 +91,7 @@ specifies which subsystems are traced out. The number of indices has to be
 smaller than the number of subsystems, i.e. it is not allowed to perform a
 full trace.
 """
-function ptrace(b::TensorBasis, indices)
+function ptrace(b::CompositeBasis, indices)
     J = [i for i in 1:length(b.bases) if i ∉ indices]
     length(J) > 0 || throw(ArgumentError("Tracing over all indices is not allowed in ptrace."))
     reduced(b, J)
@@ -106,16 +106,16 @@ Change the ordering of the subsystems of the given object.
 For a permutation vector `[2,1,3]` and a given object with basis `[b1, b2, b3]`
 this function results in `[b2, b1, b3]`.
 """
-function permutesystems(b::TensorBasis, perm)
+function permutesystems(b::CompositeBasis, perm)
     @assert length(b.bases) == length(perm)
     @assert isperm(perm)
-    TensorBasis(b.bases[perm])
+    CompositeBasis(b.bases[perm])
 end
 
 """
     SumBasis(b1, b2...)
 
-Similar to [`TensorBasis`](@ref) but for the [`directsum`](@ref) (⊕)
+Similar to [`CompositeBasis`](@ref) but for the [`directsum`](@ref) (⊕)
 """
 struct SumBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
     bases
@@ -129,11 +129,11 @@ SumBasis(bases::Vector) = SumBasis((bases...,))
 
 Construct the [`SumBasis`](@ref) out of two sub-bases.
 """
-directsum(b::Basis) = TensorBasis(b)
-directsum(b1::Basis, b2::Basis) = TensorBasis(b1, b2)
-directsum(b1::SumBasis, b2::SumBasis) = TensorBasis(b1.bases..., b1.bases...)
-directsum(b1::SumBasis, b2::Basis) = TensorBasis(b1.bases..., b2)
-directsum(b1::Basis, b2::SumBasis) = TensorBasis(b1, b2.bases...)
+directsum(b::Basis) = CompositeBasis(b)
+directsum(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
+directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(b1.bases..., b1.bases...)
+directsum(b1::SumBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
+directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, b2.bases...)
 directsum(bases::Basis...) = reduce(dicectsum, bases)
 
 embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
@@ -329,8 +329,11 @@ end
 PositionBasis(b::MomentumBasis) = (dp = (b.pmax - b.pmin)/b.N; PositionBasis(-pi/dp, pi/dp, b.N))
 MomentumBasis(b::PositionBasis) = (dx = (b.xmax - b.xmin)/b.N; MomentumBasis(-pi/dx, pi/dx, b.N))
 
+struct CoherentStateBasis{N,min,max} <: Basis{N}
+    CoherentStateBasis(N::Number, min::F, max::F) where {F<:Real} =
+        isinf(N) ? new{-Inf,Inf,Inf}() : new{min,max,N}()
+end
 
-# TODO CoherentStateBasis?
 # TODO GaussianBasis? as operator basis only???
 
 ##
@@ -343,13 +346,23 @@ MomentumBasis(b::PositionBasis) = (dx = (b.xmax - b.xmin)/b.N; MomentumBasis(-pi
 Typical "Ket-Bra" Basis.
 TODO: write more...
 """
-struct KetBraBasis{BL<:Basis, BR<:Basis} <: OperatorBasis
+struct KetBraBasis{BL<:Basis, BR<:Basis} <: OperatorBasis{N,M}
     left::BL
     right::BR
-    KetBraBasis(bl::Basis, br::Basis) = new{typeof(bl),typeof(br)}(bl,br)
+    KetBraBasis(bl, br) = new{typeof(bl),typeof(br)}(bl,br)
 end
-Base.length(b::KetBraBasis) = b.left*b.right
 
+struct HeisenbergWeylBasis{N,M} <: OperatorBasis{N,M}
+    HeisenbergWeylBasis(dim) = new{dim,dim}()
+    # TODO: add ordering? i.e. symplectic form
+end
+
+# while maybe not totally technically correct at least method dispatch
+# can make this safe? and then tensor can work...
+struct PauliBasis{N,M} <: OperatorBasis{N,M}
+    PauliBasis() = new{SpinBasis(1//2),SpinBasis(1//2)}()
+    # TODO: add ordering? i.e. symplectic form
+end
 
 """
     PauliBasis(num_qubits)
@@ -357,7 +370,29 @@ Base.length(b::KetBraBasis) = b.left*b.right
 Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
 The dimension of the basis is 2²ᴺ.
 """
-struct PauliBasis{T} <: OperatorBasis
+struct OldPauliBasis{T} <: OperatorBasis
     PauliBasis(num_qubits) = new{num_qubits}()
+    # TODO: add ordering? i.e. symplectic form
 end
-Base.length(b::PauliBasis{N}) where {N} = 4^N
+
+struct TensorOperatorBasis{N, T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis{N,M}
+    bases
+    CompositeBasis(x) = new{prod(length.(x)), typeof(x)}(x)
+end
+CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
+CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
+
+"""
+    tensor(x::Basis, y::Basis, z::Basis...)
+
+Create a [`CompositeBasis`](@ref) from the given bases.
+
+Any given CompositeBasis is expanded so that the resulting CompositeBasis never
+contains another CompositeBasis.
+"""
+tensor(b::Basis) = CompositeBasis(b)
+tensor(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
+tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(b1.bases..., b1.bases...)
+tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
+tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, b2.bases...)
+tensor(bases::Basis...) = reduce(tensor, bases)

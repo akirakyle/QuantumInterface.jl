@@ -11,7 +11,7 @@ and only if an instance is a subtype of OperatorBasis{B,B} where {B <: Basis}.
 Furthermore all subtypes must implement `Base.length` which returns the dimension
 of the Hilbert space.
 
-Composite systems can be defined with help of the [`TensorBasis`](@ref) class.
+Composite systems can be defined with help of the [`CompositeBasis`](@ref) class.
 
 N represents the underlying hilbert space, charicterized by it's dimensionality
 Subtypes can add more type parameters as needed...
@@ -28,16 +28,18 @@ See [TODO: reference operators.md in docs]
 """
 #abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
 #struct OperatorBasis{BL<:Basis,BR<:Basis} end
-abstract type OperatorBasis{N,N} end
+abstract type OperatorBasis{N,M} end
 Base.:(==)(b1::T, b2::T) where {T<:OperatorBasis} = true
 Base.:(==)(b1::OperatorBasis, b2::OperatorBasis) = false
+length_left(b::OperatorBasis{N,M}) where {N,M} = length(N)
+length_right(b::OperatorBasis{N,M}) where {N,M} = length(N)
 
 """
 Parametric composite type for all superoperator bases.
 
 See [TODO: reference superoperators.md in docs]
 """
-abstract type SuperOperatorBasis{N,N} end
+abstract type SuperOperatorBasis{N,M} end
 Base.:(==)(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
 Base.:(==)(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
 
