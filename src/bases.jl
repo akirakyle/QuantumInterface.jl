@@ -333,17 +333,21 @@ end
 PositionBasis(b::MomentumBasis) = (dp = (b.pmax - b.pmin)/b.N; PositionBasis(-pi/dp, pi/dp, b.N))
 MomentumBasis(b::PositionBasis) = (dx = (b.xmax - b.xmin)/b.N; MomentumBasis(-pi/dx, pi/dx, b.N))
 
+"""
+    CoherentStateBasis(Npoints, min, max)
+
+Basis for a particle in phase space with cutoff in x and p of min to max.
+elements are ket{alpha}
+"""
 struct CoherentStateBasis{N,min,max} <: Basis{N}
     CoherentStateBasis(N::Number, min::F, max::F) where {F<:Real} =
         isinf(N) ? new{-Inf,Inf,Inf}() : new{min,max,N}()
 end
 
-# TODO GaussianBasis? as operator basis only???
 
 ##
 # Common operator bases
 ##
-
 
 """
     CompositeOperatorBasis(BL,BR)
@@ -428,6 +432,26 @@ tensor(b::PauliBasis) = b # TODO is this right?
 tensor(b1::PauliBasis, b2::PauliBasis) = PauliBasis(b1.modes+b2.modes)
 tensor(bases::PauliBasis...) = reduce(tensor, bases)
 
+"""
+    GaussianBasis(modes)
+
+Operator basis in terms of Gaussians in phase space. 
+cutoffs are number of Gaussian basis elements alllowed to be superposed...
+So normal Gaussian state formalism correspnods to one in each mode.
+"""
+struct GaussianBasis{N,cutoffs} <: OperatorBasis{N}
+    cutoffs
+    GaussianBasis(cutoffs::Tuple{Integer}) =
+        new{(prod(cutoffs),prod(cutoffs)),cutoffs}(cutoffs)
+    # TODO: add ordering? i.e. symplectic form
+end
+GaussianBasis(modes::Integer, cutoff::Integer) = GaussianBasis(ntuple(i->cutoff, modes))
+
+tensor(b::GaussianBasis) = b # TODO is this right?
+tensor(b1::GaussianBasis, b2::GaussianBasis) = GaussianBasis(b1.dims..., b2.dims...)
+tensor(bases::GaussianBasis...) = reduce(tensor, bases)
+
+
 ##
 # Common super-operator bases
 ##
@@ -442,7 +466,7 @@ TODO: write more...
 struct KetKetBraBraBasis{N,BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBasis{N}
     left::BL
     right::BR
-    KetBraBasis(bl, br) = new{length(bl), length(br), typeof(bl), typeof(br)}(bl, br)
+    KetBraBasis(bl, br) = new{(length(bl), length(br)), typeof(bl), typeof(br)}(bl, br)
 end
 
 tensor(b::KetKetBraBraBasis) = b # TODO is this right?
