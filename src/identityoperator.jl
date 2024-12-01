@@ -1,5 +1,3 @@
-one(x::Union{<:Basis,<:AbstractOperator}) = identityoperator(x)
-
 """
     identityoperator(a::Basis[, b::Basis])
     identityoperator(::Type{<:AbstractOperator}, a::Basis[, b::Basis])

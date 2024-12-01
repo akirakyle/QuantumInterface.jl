@@ -1,10 +1,24 @@
-import Base: ==, +, -, *, /, ^, length, one, exp, conj, conj!, transpose, copy
+import Base: ==, +, -, *, /, ^, length, size, one, exp, conj, conj!, transpose, copy
 
 # Common error messages
 arithmetic_unary_error(funcname, x::AbstractOperator) = throw(ArgumentError("$funcname is not defined for this type of operator: $(typeof(x)).\nTry to convert to another operator type first with e.g. dense() or sparse()."))
 arithmetic_binary_error(funcname, a::AbstractOperator, b::AbstractOperator) = throw(ArgumentError("$funcname is not defined for this combination of types of operators: $(typeof(a)), $(typeof(b)).\nTry to convert to a common operator type first with e.g. dense() or sparse()."))
 addnumbererror() = throw(ArgumentError("Can't add or subtract a number and an operator. You probably want 'op + identityoperator(op)*x'."))
 
+
+##
+# Bases
+##
+
+==(b1::T, b2::T) where {T<:Basis} = true
+==(b1::Basis, b2::Basis) = false
+length(b::Basis{N}) where {N} = N
+==(b1::T, b2::T) where {T<:OperatorBasis} = true
+==(b1::OperatorBasis, b2::OperatorBasis) = false
+size(b::OperatorBasis{N}) where {N} = N
+==(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
+==(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
+size(b::SuperOperatorBasis{N}) where {N} = N
 
 ##
 # States
@@ -14,7 +28,6 @@ addnumbererror() = throw(ArgumentError("Can't add or subtract a number and an op
 *(a::StateVector, b::Number) = b*a
 copy(a::T) where {T<:StateVector} = T(a.basis, copy(a.data)) # FIXME
 length(a::StateVector) = length(basis(a))::Int
-basis(a::StateVector) = fullbasis(a)
 directsum(x::StateVector...) = reduce(directsum, x)
 
 # Array-like functions
@@ -34,9 +47,9 @@ Base.adjoint(a::StateVector) = dagger(a)
 # Operators
 ##
 
-length(a::AbstractOperator) = (b=fullbasis(a); length(b.left)::Int*length(b.right)::Int)
-basis(a::AbstractOperator) = (b=fullbasis(a); check_samebases(b); b.left)
-basis(a::AbstractSuperOperator) = (b=fullbasis(a); check_samebases(b); b.left.left)
+length(a::AbstractOperator) = prod(size(basis(a)))
+transpose(a::AbstractOperator) = arithmetic_unary_error("Transpose", a)
+one(x::Union{<:Basis,<:AbstractOperator}) = identityoperator(x)
 
 # Ensure scalar broadcasting
 Base.broadcastable(x::AbstractOperator) = Ref(x)
@@ -62,11 +75,11 @@ Operator exponential.
 """
 exp(op::AbstractOperator) = throw(ArgumentError("exp() is not defined for this type of operator: $(typeof(op)).\nTry to convert to dense operator first with dense()."))
 
-Base.size(op::AbstractOperator) = (b=fullbasis(op); (length(b.left),length(b.right)))
+Base.size(op::AbstractOperator) = size(basis(op))
 function Base.size(op::AbstractOperator, i::Int)
     i < 1 && throw(ErrorException("dimension index is < 1"))
     i > 2 && return 1
-    i==1 ? length(fullbasis(op).left) : length(fullbasis(op).right)
+    size(basis(op))[i]
 end
 
 Base.adjoint(a::AbstractOperator) = dagger(a)

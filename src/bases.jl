@@ -1,3 +1,6 @@
+##
+# Generic, composite, sum bases
+##
 
 """
     GenericBasis(N)
@@ -174,6 +177,7 @@ spinnumber(b::SpinBasis{N,T}) where {N,T} = T
 A basis describing a subspace embedded a higher dimensional Hilbert space.
 """
 struct SubspaceBasis{N,B,H} <: Basis{N}
+    superbasis
     basisstates
     function SubspaceBasis(superbasis::Basis, basisstates::Vector{<:AbstractKet})
         for state = basisstates
@@ -182,10 +186,11 @@ struct SubspaceBasis{N,B,H} <: Basis{N}
             end
         end
         H = hash([hash(x) for x=basisstates])
-        new{length(basisstates), superbasis, H}(basisstates)
+        new{length(basisstates), superbasis, H}(superbasis, basisstates)
     end
 end
 SubspaceBasis(basisstates::Vector) = SubspaceBasis(basis(basisstates[1]), basisstates)
+associatedbasis(b::SubspaceBasis) = b.superbasis
 basisstates(b::SubspaceBasis) = b.basisstates
 
 """
@@ -203,8 +208,8 @@ struct ManyBodyBasis{N,B,H} <: Basis{N}
     ManyBodyBasis(onebodybasis::Basis, occupations) =
         new{length(occupations), onebodybasis, hash(hash.(occupations))}(onebodybasis, occupations)
 end
-onebodybasis(b::ManyBodyBasis) = b.onebodybasis
-occupations(b::ManyBodyBasis) = b.occupations
+associatedbasis(b::ManyBodyBasis) = b.onebodybasis
+basisstates(b::ManyBodyBasis) = b.occupations
 
 """
     ChargeBasis(ncut) <: Basis
@@ -427,7 +432,7 @@ struct PauliBasis{N,modes} <: UnitaryOperatorBasis{N}
     PauliBasis(modes::Integer) = new{(2^modes,2^modes),modes}()
     # TODO: add ordering? i.e. symplectic form
 end
-modes(b::PauliBasis{N,M}) where {N,M} = M
+nsubsystems(b::PauliBasis{N,M}) where {N,M} = M
 
 tensor(b::PauliBasis) = b # TODO is this right?
 tensor(b1::PauliBasis, b2::PauliBasis) = PauliBasis(b1.modes+b2.modes)
@@ -456,7 +461,6 @@ tensor(bases::GaussianBasis...) = reduce(tensor, bases)
 ##
 # Common super-operator bases
 ##
-
 
 """
     KetKetBraBraBasis(BL,BR)

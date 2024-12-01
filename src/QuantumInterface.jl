@@ -1,56 +1,46 @@
 module QuantumInterface
 
-"""
-    length(b::Basis)
-
-Total dimension of the Hilbert space.
-"""
-function length end
+##
+# Basis specific
+##
 
 """
     basis(a)
 
 Return the basis of an object.
 
-
 Returns B where B<:Basis when typeof(a)<:StateVector.
 Returns B where B<:OperatorBasis when typeof(a)<:AbstractOperator.
 Returns B where B<:SuperOperatorBasis for typeof(a)<:AbstractSuperOperator.
 """
 function basis end
-#basis(sv::StateVector{B}) where {B} = B
-#basis(op::AbstractOperator{OperatorBasis{B,B}}) where {B} = B
-#basis(op::AbstractSuperOperator{SuperOperatorBasis{OperatorBasis{B,B}, OperatorBasis{B,B}}}) where {B} = B
 
-function apply! end
+function bases end
 
-function dagger end
+function spinnumber end
 
-function directsum end
-const ⊕ = directsum
-directsum() = GenericBasis(0)
+function basisstates end
 
-function dm end
+function associatedbasis end
 
-function embed end
+function cutoff end
 
-function entanglement_entropy end
+function cutoff_min end
 
-function expect end
+function cutoff_max end
 
-function identityoperator end
+function offset end
 
-function permutesystems end
+function left end
 
-function projector end
+function right end
 
-function project! end
+function cutoffs end
 
-function projectrand! end
 
-function ptrace end
-
-function reduced end
+##
+# Composite system specific
+##
 
 """
     tensor(x, y, z...)
@@ -64,9 +54,47 @@ tensor() = throw(ArgumentError("Tensor function needs at least one argument."))
 
 function tensor_pow end # TODO should Base.^ be the same as tensor_pow?
 
+function nsubsystems end
+
+function permutesystems end
+
+function ptrace end
+
+function reduced end
+
 function traceout! end
 
+function embed end
+
+function directsum end
+const ⊕ = directsum
+directsum() = GenericBasis(0)
+
+
+##
+# Functions on quantum objects
+##
+
+function dm end
+
+function identityoperator end
+
+function apply! end
+
+function dagger end
+
+function entanglement_entropy end
+
+function expect end
+
+function projector end
+
+function project! end
+
+function projectrand! end
+
 function variance end
+
 
 ##
 # Qubit specific
@@ -88,6 +116,7 @@ function projectZrand! end
 
 function reset_qubits! end
 
+
 ##
 # Quantum optics specific
 ##
@@ -103,24 +132,24 @@ function squeeze end
 function wigner end
 
 
+##
+# includes
+##
+
 include("abstract_types.jl")
 include("bases.jl")
+include("show.jl")
 
 include("linalg.jl")
 include("tensor.jl")
+include("identityoperator.jl")
 include("embed_permute.jl")
 include("expect_variance.jl")
-include("identityoperator.jl")
 
 include("julia_base.jl")
 include("julia_linalg.jl")
 include("sparse.jl")
 
-include("show.jl")
-
 include("sortedindices.jl")
-
-# TODO put me in the right place...
-traceout!(s::StateVector, i) = ptrace(s,i)
 
 end # module

@@ -21,11 +21,11 @@ both the number of basis elements and size of Hilbert space
 subtypes all have function interface to access all relevant fields of each basis so
 downstream should only use that interface and not assume internal layout.
 see https://docs.julialang.org/en/v1/manual/style-guide/#Prefer-exported-methods-over-direct-field-access
+
+length() is total dimension of the Hilbert space.
+== shoud be equality...
 """
 abstract type Basis{N} end
-Base.:(==)(b1::T, b2::T) where {T<:Basis} = true
-Base.:(==)(b1::Basis, b2::Basis) = false
-Base.length(b::Basis{N}) where {N} = N
 
 """
 Parametric composite type for all operator bases.
@@ -39,13 +39,8 @@ N is two-tuple describing left and right hilbert space dimensions
 
 See [TODO: reference operators.md in docs]
 """
-#abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
-#struct OperatorBasis{BL<:Basis,BR<:Basis} end
 abstract type OperatorBasis{N} end
 abstract type UnitaryOperatorBasis{N} <: OperatorBasis{N} end
-Base.:(==)(b1::T, b2::T) where {T<:OperatorBasis} = true
-Base.:(==)(b1::OperatorBasis, b2::OperatorBasis) = false
-Base.size(b::OperatorBasis{N}) where {N} = N
 
 """
 Parametric composite type for all superoperator bases.
@@ -55,9 +50,6 @@ N is two-tuple of two-tuples describing left and right operator dimensions
 See [TODO: reference superoperators.md in docs]
 """
 abstract type SuperOperatorBasis{N} end
-Base.:(==)(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
-Base.:(==)(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
-Base.size(b::SuperOperatorBasis{N}) where {N} = N
 
 """
 Exception that should be raised for an illegal algebraic operation.
@@ -69,7 +61,7 @@ Abstract type for `Bra` and `Ket` states.
 
 The state vector type stores an abstract state with respect to a certain
 Hilbert space basis.
-All deriving types must define the `fullbasis` function which
+All deriving types must define the `basis` function which
 returns the state vector's underlying `Basis`.
 
 Must implement hash for subspace basis?
@@ -82,7 +74,7 @@ abstract type AbstractBra{B} <: StateVector{B} end
 Abstract type for all operators which represent linear maps between two
 Hilbert spaces with respect to a given basis in each space.
 
-All deriving operator types must define the `fullbasis` function which
+All deriving operator types must define the `basis` function which
 returns the operator's underlying `OperatorBasis`.
 
 For fast time evolution also at least the function
@@ -98,7 +90,7 @@ abstract type AbstractOperator{B<:OperatorBasis} end
 Abstract type for all super-operators which represent linear maps between two
 operator spaces with respect to a given basis for each space.
 
-All deriving operator types must define the `fullbasis` function which
+All deriving operator types must define the `basis` function which
 returns the operator's underlying `SuperOperatorBasis`.
 
 See [TODO: reference superoperators.md in docs]

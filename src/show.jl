@@ -1,16 +1,19 @@
 import Base: show, summary
 
 function summary(stream::IO, x::AbstractOperator)
-    b = fullbasis(x)
-    print(stream, "$(typeof(x).name.name)(dim=$(length(b.left))x$(length(b.right)))\n")
-    if samebases(b)
+    b = basis(x)
+    print(stream, "$(typeof(x).name.name)(dim=$(size(b)[1])x$(size(b)[2]))\n")
+    if b isa KetBraBasis && left(b) == right(b)
+        print(stream, "  basis: ")
+        show(stream, left(basis(b)))
+    elseif b isa KetBraBasis
+        print(stream, "  basis left:  ")
+        show(stream, left(b))
+        print(stream, "\n  basis right: ")
+        show(stream, right(b))
+    else
         print(stream, "  basis: ")
         show(stream, basis(b))
-    else
-        print(stream, "  basis left:  ")
-        show(stream, b.left)
-        print(stream, "\n  basis right: ")
-        show(stream, b.right)
     end
 end
 
