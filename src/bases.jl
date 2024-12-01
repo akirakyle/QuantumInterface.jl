@@ -1,21 +1,4 @@
 
-# According to this I should use singleton type instances instead of types themselves
-# https://discourse.julialang.org/t/singleton-types-vs-instances-as-type-parameters/2802/3
-# I think I would've needed a `Type{}` to get equality working above with subtypes such as
-# abstract type GenericBasis{T} <: Basis{T} end
-# GenericBasis(T) = GenericBasis{T}
-# Base.length(b::Type{GenericBasis{N}}) where {N} = N
-# abstract type CompositeBasis{T<:Tuple{Vararg{<:Basis}}} <: Basis{T} end
-# CompositeBasis(bases::Tuple) = CompositeBasis{Tuple{bases...}}
-# CompositeBasis(bases::Vector) = CompositeBasis{Tuple{bases...}}
-# CompositeBasis(bases...) = CompositeBasis{Tuple{bases...}}
-# bases(b::Type{CompositeBasis{T}}) where {T} = fieldtypes(T)
-# Base.length(b::Type{CompositeBasis{T}}) where {T} = prod(length.(fieldtypes(T)))
-
-# TODO: create function interface to access all relevant fields of each basis so
-# that downstream code only uses funcitos and not fields...
-# see https://docs.julialang.org/en/v1/manual/style-guide/#Prefer-exported-methods-over-direct-field-access
-
 """
     GenericBasis(N)
 
@@ -44,6 +27,7 @@ struct CompositeBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
 end
 CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
 CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
+bases(b::CompositeBasis) = b.bases
 
 """
     tensor(x::Basis, y::Basis, z::Basis...)
@@ -55,9 +39,9 @@ contains another CompositeBasis.
 """
 tensor(b::Basis) = CompositeBasis(b)
 tensor(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(b1.bases..., b1.bases...)
-tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
-tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, b2.bases...)
+tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
+tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
+tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, bases(b2)...)
 tensor(bases::Basis...) = reduce(tensor, bases)
 
 function Base.:^(b::Basis, N::Integer)
@@ -79,9 +63,9 @@ function reduced(b::CompositeBasis, indices)
     if length(indices)==0
         throw(ArgumentError("At least one subsystem must be specified in reduced."))
     elseif length(indices)==1
-        return b.bases[indices[1]]
+        return bases(b)[indices[1]]
     else
-        return CompositeBasis(b.bases[indices])
+        return CompositeBasis(bases(b)[indices])
     end
 end
 
@@ -96,7 +80,7 @@ smaller than the number of subsystems, i.e. it is not allowed to perform a
 full trace.
 """
 function ptrace(b::CompositeBasis, indices)
-    J = [i for i in 1:length(b.bases) if i ∉ indices]
+    J = [i for i in 1:length(bases(b)) if i ∉ indices]
     length(J) > 0 || throw(ArgumentError("Tracing over all indices is not allowed in ptrace."))
     reduced(b, J)
 end
@@ -111,9 +95,9 @@ For a permutation vector `[2,1,3]` and a given object with basis `[b1, b2, b3]`
 this function results in `[b2, b1, b3]`.
 """
 function permutesystems(b::CompositeBasis, perm)
-    @assert length(b.bases) == length(perm)
+    @assert length(bases(b)) == length(perm)
     @assert isperm(perm)
-    CompositeBasis(b.bases[perm])
+    CompositeBasis(bases(b)[perm])
 end
 
 """
@@ -127,6 +111,7 @@ struct SumBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
 end
 SumBasis(bases::Basis...) = SumBasis((bases...,))
 SumBasis(bases::Vector) = SumBasis((bases...,))
+bases(b::SumBasis) = b.bases
 
 """
     directsum(b1::Basis, b2::Basis)
@@ -135,9 +120,9 @@ Construct the [`SumBasis`](@ref) out of two sub-bases.
 """
 directsum(b::Basis) = CompositeBasis(b)
 directsum(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(b1.bases..., b1.bases...)
-directsum(b1::SumBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
-directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, b2.bases...)
+directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
+directsum(b1::SumBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
+directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, bases(b2)...)
 directsum(bases::Basis...) = reduce(dicectsum, bases)
 
 embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
@@ -201,6 +186,7 @@ struct SubspaceBasis{N,B,H} <: Basis{N}
     end
 end
 SubspaceBasis(basisstates::Vector) = SubspaceBasis(basis(basisstates[1]), basisstates)
+basisstates(b::SubspaceBasis) = b.basisstates
 
 """
     ManyBodyBasis(b, occupations)
@@ -212,10 +198,13 @@ should be included. The occupations_hash is used to speed up checking if two
 many-body bases are equal.
 """
 struct ManyBodyBasis{N,B,H} <: Basis{N}
+    onebodybasis
     occupations
     ManyBodyBasis(onebodybasis::Basis, occupations) =
-        new{length(occupations), onebodybasis, hash(hash.(occupations))}(occupations)
+        new{length(occupations), onebodybasis, hash(hash.(occupations))}(onebodybasis, occupations)
 end
+onebodybasis(b::ManyBodyBasis) = b.onebodybasis
+occupations(b::ManyBodyBasis) = b.occupations
 
 """
     ChargeBasis(ncut) <: Basis
@@ -241,6 +230,7 @@ struct ChargeBasis{N,T} <: Basis{N}
         new{n2*ncut + 1, cut}()
     end
 end
+cutoff(b::ChargeBasis{N,T}) where {N,T} = T
 
 """
     ShiftedChargeBasis(nmin, nmax) <: Basis
@@ -255,6 +245,8 @@ struct ShiftedChargeBasis{N,T,S} <: Basis{N}
         new{nmax-nmin+1,nmin,nmax}()
     end
 end
+cutoff_min(b::ShiftedChargeBasis{N,T,S}) where {N,T,S} = T
+cutoff_max(b::ShiftedChargeBasis{N,T,S}) where {N,T,S} = S
 
 
 ##
@@ -283,7 +275,7 @@ cutoff(b::FockBasis{N,C,O}) where {N,C,O} = C
 offset(b::FockBasis{N,C,O}) where {N,C,O} = O
 
 """
-    PositionBasis(xmin, xmax, Npoints)
+    PositionBasis(Npoints, xmin, xmax)
     PositionBasis(b::MomentumBasis)
 
 Basis for a particle in real space.
@@ -299,12 +291,14 @@ more or less arbitrary and are chosen to be
 """
 struct PositionBasis{N,xmin,xmax} <: Basis{N}
     PositionBasis(N::Number, xmin::F, xmax::F) where {F<:Real} =
-        isinf(N) ? new{-Inf,Inf,Inf}() : new{xmin,xmax,N}()
+        isinf(N) ? new{Inf,-Inf,Inf}() : new{N,xmin,xmax}()
 end
-function PositionBasis(xmin::F1, xmax::F2, N) where {F1,F2}
+function PositionBasis(N, xmin::F1, xmax::F2) where {F1,F2}
     F = promote_type(F1,F2)
     return PositionBasis(N, convert(F,xmin), convert(F,xmax))
 end
+cutoff_min(b::PositionBasis{N,xmin,xmax}) where {N,xmin,xmax} = xmin
+cutoff_max(b::PositionBasis{N,xmin,xmax}) where {N,xmin,xmax} = xmax
 
 """
     MomentumBasis(pmin, pmax, Npoints)
@@ -321,13 +315,15 @@ more or less arbitrary and are chosen to be
 ``-\\pi/dx`` and ``\\pi/dx`` with ``dx=(x_{max}-x_{min})/N``.
 """
 struct MomentumBasis{N,pmin,pmax} <: Basis{N}
-    MomentumBasis(pmin::F, pmax::F, N::T) where {F<:Real, T<:Integer} =
-        isinf(N) ? new{-Inf,Inf,Inf}() : new{pmin,pmax,N}()
+    MomentumBasis(N::T, pmin::F, pmax::F) where {F<:Real, T<:Integer} =
+        isinf(N) ? new{Inf,-Inf,Inf}() : new{N,pmin,pmax}()
 end
 function MomentumBasis(N, pmin::F1, pmax::F2) where {F1,F2}
     F = promote_type(F1,F2)
     return MomentumBasis(N, convert(F,pmin), convert(F,pmax))
 end
+cutoff_min(b::MomentumBasis{N,pmin,pmax}) where {N,pmin,pmax} = pmin
+cutoff_max(b::MomentumBasis{N,pmin,pmax}) where {N,pmin,pmax} = pmax
 
 # FIXME
 PositionBasis(b::MomentumBasis) = (dp = (b.pmax - b.pmin)/b.N; PositionBasis(-pi/dp, pi/dp, b.N))
@@ -341,8 +337,10 @@ elements are ket{alpha}
 """
 struct CoherentStateBasis{N,min,max} <: Basis{N}
     CoherentStateBasis(N::Number, min::F, max::F) where {F<:Real} =
-        isinf(N) ? new{-Inf,Inf,Inf}() : new{min,max,N}()
+        isinf(N) ? new{Inf,-Inf,Inf}() : new{N,min,max}()
 end
+cutoff_min(b::CoherentStateBasis{N,min,max}) where {N,min,max} = min
+cutoff_max(b::CoherentStateBasis{N,min,max}) where {N,min,max} = max
 
 
 ##
@@ -366,6 +364,7 @@ struct CompositeOperatorBasis{N,T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasi
 end
 CompositeOperatorBasis(bases::OperatorBasis...) = CompositeOperatorBasis((bases...,))
 CompositeOperatorBasis(bases::Vector) = CompositeOperatorBasis((bases...,))
+bases(b::CompositeOperatorBasis) = b.bases
 
 """
     tensor(x::Basis, y::Basis, z::Basis...)
@@ -393,6 +392,8 @@ struct KetBraBasis{N,BL<:Basis,BR<:Basis} <: OperatorBasis{N}
     right::BR
     KetBraBasis(bl, br) = new{(length(bl), length(br)), typeof(bl), typeof(br)}(bl, br)
 end
+left(b::KetBraBasis) = b.left
+right(b::KetBraBasis) = b.right
 
 tensor(b::KetBraBasis) = b # TODO is this right?
 tensor(b1::KetBraBasis, b2::KetBraBasis) = KetBraBasis(b1.left⊗b2.left, b1.right⊗b2.right)
@@ -405,12 +406,12 @@ Unitary operator basis for a tensor product of modes number of dim_i-dimensional
 the clock-shift matrices.
 """
 struct HeisenbergWeylBasis{N,dims} <: UnitaryOperatorBasis{N}
-    dims
     HeisenbergWeylBasis(dims::Tuple{Integer}) =
-        new{(prod(dims),prod(dims)),dims}(dims)
+        new{(prod(dims),prod(dims)),dims}()
     # TODO: add ordering? i.e. symplectic form
 end
 HeisenbergWeylBasis(modes::Integer, dim::Integer) = HeisenbergWeylBasis(ntuple(i->dim, modes))
+dimensions(b::HeisenbergWeylBasis{N,dims}) where {N,dims} = dims
 
 tensor(b::HeisenbergWeylBasis) = b # TODO is this right?
 tensor(b1::HeisenbergWeylBasis, b2::HeisenbergWeylBasis) = HeisenbergWeylBasis(b1.dims..., b2.dims...)
@@ -423,10 +424,10 @@ Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
 The dimension of the basis is 2ᴺ times 2ᴺ.
 """
 struct PauliBasis{N,modes} <: UnitaryOperatorBasis{N}
-    modes
-    PauliBasis(modes::Integer) = new{(2^modes,2^modes),modes}(modse)
+    PauliBasis(modes::Integer) = new{(2^modes,2^modes),modes}()
     # TODO: add ordering? i.e. symplectic form
 end
+modes(b::PauliBasis{N,M}) where {N,M} = M
 
 tensor(b::PauliBasis) = b # TODO is this right?
 tensor(b1::PauliBasis, b2::PauliBasis) = PauliBasis(b1.modes+b2.modes)
@@ -440,12 +441,12 @@ cutoffs are number of Gaussian basis elements alllowed to be superposed...
 So normal Gaussian state formalism correspnods to one in each mode.
 """
 struct GaussianBasis{N,cutoffs} <: OperatorBasis{N}
-    cutoffs
     GaussianBasis(cutoffs::Tuple{Integer}) =
-        new{(prod(cutoffs),prod(cutoffs)),cutoffs}(cutoffs)
+        new{(prod(cutoffs),prod(cutoffs)),cutoffs}()
     # TODO: add ordering? i.e. symplectic form
 end
 GaussianBasis(modes::Integer, cutoff::Integer) = GaussianBasis(ntuple(i->cutoff, modes))
+cutoffs(b::GaussianBasis{N,C}) where {N,C} = C
 
 tensor(b::GaussianBasis) = b # TODO is this right?
 tensor(b1::GaussianBasis, b2::GaussianBasis) = GaussianBasis(b1.dims..., b2.dims...)
@@ -468,6 +469,8 @@ struct KetKetBraBraBasis{N,BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBas
     right::BR
     KetBraBasis(bl, br) = new{(length(bl), length(br)), typeof(bl), typeof(br)}(bl, br)
 end
+left(b::KetKetBraBraBasis) = b.left
+right(b::KetKetBraBraBasis) = b.right
 
 tensor(b::KetKetBraBraBasis) = b # TODO is this right?
 tensor(b1::KetKetBraBraBasis, b2::KetKetBraBraBasis) = KetKetBraBraBasis(b1.left⊗b2.left, b1.right⊗b2.right)

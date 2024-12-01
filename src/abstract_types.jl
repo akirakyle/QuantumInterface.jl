@@ -17,6 +17,10 @@ N represents the underlying hilbert space, charicterized by it's dimensionality
 Subtypes can add more type parameters as needed...
 TODO: specify that it really should represent an orthornormal basis so that N is
 both the number of basis elements and size of Hilbert space
+
+subtypes all have function interface to access all relevant fields of each basis so
+downstream should only use that interface and not assume internal layout.
+see https://docs.julialang.org/en/v1/manual/style-guide/#Prefer-exported-methods-over-direct-field-access
 """
 abstract type Basis{N} end
 Base.:(==)(b1::T, b2::T) where {T<:Basis} = true
