@@ -340,47 +340,24 @@ end
 # Common operator bases
 ##
 
-"""
-    KetBraBasis(BL,BR)
-
-Typical "Ket-Bra" Basis.
-TODO: write more...
-"""
-struct KetBraBasis{BL<:Basis, BR<:Basis} <: OperatorBasis{N,M}
-    left::BL
-    right::BR
-    KetBraBasis(bl, br) = new{typeof(bl),typeof(br)}(bl,br)
-end
-
-struct HeisenbergWeylBasis{N,M} <: OperatorBasis{N,M}
-    HeisenbergWeylBasis(dim) = new{dim,dim}()
-    # TODO: add ordering? i.e. symplectic form
-end
-
-# while maybe not totally technically correct at least method dispatch
-# can make this safe? and then tensor can work...
-struct PauliBasis{N,M} <: OperatorBasis{N,M}
-    PauliBasis() = new{SpinBasis(1//2),SpinBasis(1//2)}()
-    # TODO: add ordering? i.e. symplectic form
-end
 
 """
-    PauliBasis(num_qubits)
+    CompositeOperatorBasis(BL,BR)
 
-Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
-The dimension of the basis is 2²ᴺ.
+Basis for composite Hilbert spaces.
+
+Stores the subbases in a tuple. Instead of creating a CompositeBasis
+directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
-struct OldPauliBasis{T} <: OperatorBasis
-    PauliBasis(num_qubits) = new{num_qubits}()
-    # TODO: add ordering? i.e. symplectic form
-end
-
-struct TensorOperatorBasis{N, T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis{N,M}
+struct CompositeOperatorBasis{N,M,T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis{N,M}
     bases
-    CompositeBasis(x) = new{prod(length.(x)), typeof(x)}(x)
+    function CompositeBasis(x)
+        N,M = reduce(((N1,M1), (N2,M2)) -> (N1*N2, M2*M2), x; init=(1,1))
+        new{N,M,typeof(x)}(x)
+    end
 end
-CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
-CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
+CompositeOperatorBasis(bases::OperatorBasis...) = CompositeOperatorBasis((bases...,))
+CompositeOperatorBasis(bases::Vector) = CompositeOperatorBasis((bases...,))
 
 """
     tensor(x::Basis, y::Basis, z::Basis...)
@@ -390,9 +367,59 @@ Create a [`CompositeBasis`](@ref) from the given bases.
 Any given CompositeBasis is expanded so that the resulting CompositeBasis never
 contains another CompositeBasis.
 """
-tensor(b::Basis) = CompositeBasis(b)
-tensor(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(b1.bases..., b1.bases...)
-tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
-tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, b2.bases...)
-tensor(bases::Basis...) = reduce(tensor, bases)
+tensor(b::OperatorBasis) = CompositeOperatorBasis(b)
+tensor(b1::OperatorBasis, b2::OperatorBasis) = CompositeOperatorBasis(b1, b2)
+tensor(b1::CompositeOperatorBasis, b2::CompositeOperatorBasis) = CompositeOperatorBasis(b1.bases..., b1.bases...)
+tensor(b1::CompositeOperatorBasis, b2::OperatorBasis) = CompositeOperatorBasis(b1.bases..., b2)
+tensor(b1::OperatorBasis, b2::CompositeOperatorBasis) = CompositeOperatorBasis(b1, b2.bases...)
+tensor(bases::OperatorBasis...) = reduce(tensor, bases)
+
+"""
+    KetBraBasis(BL,BR)
+
+Typical "Ket-Bra" Basis.
+TODO: write more...
+"""
+struct KetBraBasis{N,M,BL<:Basis, BR<:Basis} <: OperatorBasis{N,M}
+    left::BL
+    right::BR
+    KetBraBasis(bl, br) = new{length(bl), length(br), typeof(bl),typeof(br)}(bl,br)
+end
+
+tensor(b::KetBraBasis) = b # TODO is this right?
+tensor(b1::KetBraBasis, b2::KetBraBasis) = KetBraBasis(b1.left⊗b2.left, b1.right⊗b2.right)
+tensor(bases::KetBraBasis...) = reduce(tensor, bases)
+
+"""
+    HeisenbergWeylBasis(modes, dim)
+
+Unitary operator basis for a tensor product of modes number of dim_i-dimensional operator space in
+the clock-shift matrices.
+"""
+struct HeisenbergWeylBasis{N,M,dims} <: UnitaryOperatorBasis{N,M}
+    dims
+    HeisenbergWeylBasis(dims::Tuple{Integer}) =
+        new{prod(dims),prod(dims),dims}(dims)
+    # TODO: add ordering? i.e. symplectic form
+end
+HeisenbergWeylBasis(modes::Integer, dim::Integer) = HeisenbergWeylBasis(ntuple(i->dim, modes))
+
+tensor(b::HeisenbergWeylBasis) = b # TODO is this right?
+tensor(b1::HeisenbergWeylBasis, b2::HeisenbergWeylBasis) = HeisenbergWeylBasis(b1.dims..., b2.dims...)
+tensor(bases::HeisenbergWeylBasis...) = reduce(tensor, bases)
+
+"""
+    PauliBasis(num_qubits)
+
+Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
+The dimension of the basis is $2ᴺ \times 2ᴺ$.
+"""
+struct PauliBasis{N,M,modes} <: UnitaryOperatorBasis{N,M}
+    modes
+    PauliBasis(modes::Integer) = new{2^modes,2^modes,modes}(modse)
+    # TODO: add ordering? i.e. symplectic form
+end
+
+tensor(b::PauliBasis) = b # TODO is this right?
+tensor(b1::PauliBasis, b2::PauliBasis) = PauliBasis(b1.modes+b2.modes)
+tensor(bases::PauliBasis...) = reduce(tensor, bases)

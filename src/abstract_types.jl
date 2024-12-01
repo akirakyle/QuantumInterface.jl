@@ -15,6 +15,8 @@ Composite systems can be defined with help of the [`CompositeBasis`](@ref) class
 
 N represents the underlying hilbert space, charicterized by it's dimensionality
 Subtypes can add more type parameters as needed...
+TODO: specify that it really should represent an orthornormal basis so that N is
+both the number of basis elements and size of Hilbert space
 """
 abstract type Basis{N} end
 Base.:(==)(b1::T, b2::T) where {T<:Basis} = true
@@ -23,16 +25,22 @@ Base.length(b::Basis{N}) where {N} = N
 
 """
 Parametric composite type for all operator bases.
+Orthonormal Operator basis is one where inner product is given
+by Hilbert-Schmidt or trace inner prouduct product.
+TODO: write this condition down explicitly.
+Examples include pauli or Heisenberg-Weyl bases as well as
+standard "ket-bra" basis
 
 See [TODO: reference operators.md in docs]
 """
 #abstract type OperatorBasis{BL<:Basis,BR<:Basis} end
 #struct OperatorBasis{BL<:Basis,BR<:Basis} end
 abstract type OperatorBasis{N,M} end
+abstract type UnitaryOperatorBasis{N,M} <: OperatorBasis{N,M} end
 Base.:(==)(b1::T, b2::T) where {T<:OperatorBasis} = true
 Base.:(==)(b1::OperatorBasis, b2::OperatorBasis) = false
-length_left(b::OperatorBasis{N,M}) where {N,M} = length(N)
-length_right(b::OperatorBasis{N,M}) where {N,M} = length(N)
+Base.size(b::OperatorBasis{N,M}) where {N,M} = (N,M)
+Base.length(b::OperatorBasis{N,M}) where {N,M} = N*M
 
 """
 Parametric composite type for all superoperator bases.
