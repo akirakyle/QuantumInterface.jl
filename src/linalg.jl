@@ -4,6 +4,7 @@ ptrace(a::AbstractOperator, index) = arithmetic_unary_error("Partial trace", a)
 _index_complement(b::CompositeBasis, indices) = complement(length(bases(b)), indices)
 reduced(a, indices) = ptrace(a, _index_complement(basis(a), indices))
 traceout!(s::StateVector, i) = ptrace(s,i)
+traceout!(op::AbstractOperator, i) = ptrace(op,i)
 
 permutesystems(a::AbstractOperator, perm) = arithmetic_unary_error("Permutations of subsystems", a)
 

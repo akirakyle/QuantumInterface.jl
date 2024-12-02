@@ -59,3 +59,15 @@ tensor(op::AbstractOperator) = op
 tensor(operators::AbstractOperator...) = reduce(tensor, operators)
 tensor(state::StateVector) = state
 tensor(states::Vector{T}) where T<:StateVector = reduce(tensor, states)
+
+"""
+    directsum(b1::Basis, b2::Basis)
+
+Construct the [`SumBasis`](@ref) out of two sub-bases.
+"""
+directsum(b::Basis) = CompositeBasis(b)
+directsum(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
+directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
+directsum(b1::SumBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
+directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, bases(b2)...)
+directsum(bases::Basis...) = reduce(dicectsum, bases)

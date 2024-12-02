@@ -45,6 +45,9 @@ embed(basis_l::CompositeBasis, basis_r::CompositeBasis, index::Integer, op::Abst
 embed(basis::CompositeBasis, indices, operators::Vector{T}) where {T<:AbstractOperator} = embed(basis, basis, indices, operators)
 embed(basis::CompositeBasis, indices, op::AbstractOperator) = embed(basis, basis, indices, op)
 
+# TODO is this right?
+embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
+
 
 """
     embed(basis1[, basis2], indices::Vector, operators::Vector)

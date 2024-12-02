@@ -11,7 +11,7 @@ Should only be used rarely since it defeats the purpose of checking that the
 bases of state vectors and operators are correct for algebraic operations.
 The preferred way is to specify special bases for different systems.
 """
-struct GenericBasis{N} <: Basis{N}
+struct GenericBasis{N} <: Basis
     # Note no type checknig here so this can be abused to put anything that's isbits in
     GenericBasis(N) = new{N}()
 end
@@ -24,9 +24,9 @@ Basis for composite Hilbert spaces.
 Stores the subbases in a tuple. Instead of creating a CompositeBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
-struct CompositeBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
+struct CompositeBasis{T<:Tuple{Vararg{Basis}}} <: Basis
     bases
-    CompositeBasis(x) = new{prod(length.(x)), typeof(x)}(x)
+    CompositeBasis(x) = new{typeof(x)}(x)
 end
 CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
 CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
@@ -86,28 +86,13 @@ end
 
 Similar to [`CompositeBasis`](@ref) but for the [`directsum`](@ref) (⊕)
 """
-struct SumBasis{N, T<:Tuple{Vararg{Basis}}} <: Basis{N}
+struct SumBasis{T<:Tuple{Vararg{Basis}}} <: Basis
     bases
-    SumBasis(x) = new{sum(length.(x)), typeof(x)}(x)
+    SumBasis(x) = new{typeof(x)}(x)
 end
 SumBasis(bases::Basis...) = SumBasis((bases...,))
 SumBasis(bases::Vector) = SumBasis((bases...,))
 bases(b::SumBasis) = b.bases
-
-"""
-    directsum(b1::Basis, b2::Basis)
-
-Construct the [`SumBasis`](@ref) out of two sub-bases.
-"""
-directsum(b::Basis) = CompositeBasis(b)
-directsum(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
-directsum(b1::SumBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
-directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, bases(b2)...)
-directsum(bases::Basis...) = reduce(dicectsum, bases)
-
-embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
-
 
 ##
 # Common finite bases
@@ -118,7 +103,7 @@ embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
 
 Basis for a system consisting of N states.
 """
-struct NLevelBasis{N} <: Basis{N}
+struct NLevelBasis{N} <: Basis
     function NLevelBasis(N::Integer)
         if N < 1
             throw(DimensionMismatch())
@@ -136,25 +121,25 @@ The basis can be created for arbitrary spinnumbers by using a rational number,
 e.g. `SpinBasis(3//2)`. The Pauli operators are defined for all possible
 spin numbers.
 """
-struct SpinBasis{N,T} <: Basis{N}
+struct SpinBasis{spin} <: Basis
     function SpinBasis(spinnumber::Rational)
         n = numerator(spinnumber)
         d = denominator(spinnumber)
         if !(d==2 || d==1) || n < 0
             throw(DimensionMismatch())
         end
-        new{numerator(spinnumber*2 + 1), spinnumber}()
+        new{spinnumber}()
     end
 end
 SpinBasis(spinnumber) = SpinBasis(convert(Rational{Int}, spinnumber))
-spinnumber(b::SpinBasis{N,T}) where {N,T} = T
+spinnumber(b::SpinBasis{spin}) where {spin} = spin
 
 """
     SubspaceBasis(basisstates)
 
 A basis describing a subspace embedded a higher dimensional Hilbert space.
 """
-struct SubspaceBasis{N,B,H} <: Basis{N}
+struct SubspaceBasis{super,hash} <: Basis
     superbasis
     basisstates
     function SubspaceBasis(superbasis::Basis, basisstates::Vector{<:AbstractKet})
@@ -164,7 +149,7 @@ struct SubspaceBasis{N,B,H} <: Basis{N}
             end
         end
         H = hash([hash(x) for x=basisstates])
-        new{length(basisstates), superbasis, H}(superbasis, basisstates)
+        new{superbasis, H}(superbasis, basisstates)
     end
 end
 SubspaceBasis(basisstates::Vector) = SubspaceBasis(basis(basisstates[1]), basisstates)
@@ -180,11 +165,11 @@ The basis has to know the associated one-body basis `b` and which occupation sta
 should be included. The occupations_hash is used to speed up checking if two
 many-body bases are equal.
 """
-struct ManyBodyBasis{N,B,H} <: Basis{N}
+struct ManyBodyBasis{obbasis,occ} <: Basis
     onebodybasis
     occupations
     ManyBodyBasis(onebodybasis::Basis, occupations) =
-        new{length(occupations), onebodybasis, hash(hash.(occupations))}(onebodybasis, occupations)
+        new{onebodybasis, hash(hash.(occupations))}(onebodybasis, occupations)
 end
 associatedbasis(b::ManyBodyBasis) = b.onebodybasis
 basisstates(b::ManyBodyBasis) = b.occupations
@@ -205,31 +190,31 @@ H = 4E_C * (n_g * identityoperator(b) + chargeop(b))^2 - E_J * cosφ(b)
 with energies periodic in the charge offset `n_g`.
 See e.g. https://arxiv.org/abs/2005.12667.
 """
-struct ChargeBasis{N,T} <: Basis{N}
+struct ChargeBasis{ncut} <: Basis
     function ChargeBasis(ncut::Integer)
         if ncut < 0
             throw(DimensionMismatch())
         end
-        new{n2*ncut + 1, cut}()
+        new{ncut}()
     end
 end
-cutoff(b::ChargeBasis{N,T}) where {N,T} = T
+cutoff(b::ChargeBasis{ncut}) where {ncut} = cut
 
 """
     ShiftedChargeBasis(nmin, nmax) <: Basis
 
 Basis spanning `nmin, ..., nmax` charge states. See [`ChargeBasis`](@ref).
 """
-struct ShiftedChargeBasis{N,T,S} <: Basis{N}
+struct ShiftedChargeBasis{nmin,nmax} <: Basis
     function ShiftedChargeBasis(nmin::T, nmax::T) where {T<:Integer}
         if nmax <= nmin
             throw(DimensionMismatch())
         end
-        new{nmax-nmin+1,nmin,nmax}()
+        new{nmin,nmax}()
     end
 end
-cutoff_min(b::ShiftedChargeBasis{N,T,S}) where {N,T,S} = T
-cutoff_max(b::ShiftedChargeBasis{N,T,S}) where {N,T,S} = S
+cutoff_min(b::ShiftedChargeBasis{nmin,nmax}) where {nmin,nmax} = nmin
+cutoff_max(b::ShiftedChargeBasis{nmin,nmax}) where {nmin,nmax} = nmax
 
 
 ##
@@ -243,19 +228,19 @@ Basis for a Fock space where `N` specifies a cutoff, i.e. what the highest
 included fock state is. Similarly, the `offset` defines the lowest included
 fock state (default is 0). Note that the dimension of this basis is `N+1-offset`.
 """
-struct FockBasis{N,cutoff,offset} <: Basis{N}
+struct FockBasis{cut,off} <: Basis
     function FockBasis(cutoff::Number, offset::Number=0)
         if isinf(cutoff)
-            return new{Inf,Inf,0}()
+            return new{Inf,0}()
         end
         if cutoff < 0 || offset < 0 || cutoff <= offset
             throw(DimensionMismatch())
         end
-        new{cutoff-offset+1, cutoff, offset}()
+        new{cutoff, offset}()
     end
 end
-cutoff(b::FockBasis{N,C,O}) where {N,C,O} = C
-offset(b::FockBasis{N,C,O}) where {N,C,O} = O
+cutoff(b::FockBasis{cut,off}) where {cut,off} = cut
+offset(b::FockBasis{cut,off}) where {cut,off} = off
 
 """
     PositionBasis(Npoints, xmin, xmax)
@@ -272,7 +257,7 @@ of ``x_{min}`` and ``x_{max}`` are due to the periodic boundary conditions
 more or less arbitrary and are chosen to be
 ``-\\pi/dp`` and ``\\pi/dp`` with ``dp=(p_{max}-p_{min})/N``.
 """
-struct PositionBasis{N,xmin,xmax} <: Basis{N}
+struct PositionBasis{N,xmin,xmax} <: Basis
     PositionBasis(N::Number, xmin::F, xmax::F) where {F<:Real} =
         isinf(N) ? new{Inf,-Inf,Inf}() : new{N,xmin,xmax}()
 end
@@ -297,7 +282,7 @@ of ``p_{min}`` and ``p_{max}`` are due to the periodic boundary conditions
 more or less arbitrary and are chosen to be
 ``-\\pi/dx`` and ``\\pi/dx`` with ``dx=(x_{max}-x_{min})/N``.
 """
-struct MomentumBasis{N,pmin,pmax} <: Basis{N}
+struct MomentumBasis{N,pmin,pmax} <: Basis
     MomentumBasis(N::T, pmin::F, pmax::F) where {F<:Real, T<:Integer} =
         isinf(N) ? new{Inf,-Inf,Inf}() : new{N,pmin,pmax}()
 end
@@ -318,7 +303,7 @@ MomentumBasis(b::PositionBasis) = (dx = (b.xmax - b.xmin)/b.N; MomentumBasis(-pi
 Basis for a particle in phase space with cutoff in x and p of min to max.
 elements are ket{alpha}
 """
-struct CoherentStateBasis{N,min,max} <: Basis{N}
+struct CoherentStateBasis{N,min,max} <: Basis
     CoherentStateBasis(N::Number, min::F, max::F) where {F<:Real} =
         isinf(N) ? new{Inf,-Inf,Inf}() : new{N,min,max}()
 end
@@ -338,12 +323,9 @@ Basis for composite Hilbert spaces.
 Stores the subbases in a tuple. Instead of creating a CompositeBasis
 directly `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` can be used.
 """
-struct CompositeOperatorBasis{N,T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis{N}
+struct CompositeOperatorBasis{T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis
     bases
-    function CompositeBasis(x)
-        N,M = reduce(((N1,M1), (N2,M2)) -> (N1*N2, M2*M2), x; init=(1,1))
-        new{(N,M),typeof(x)}(x)
-    end
+    CompositeBasis(x) = new{typeof(x)}(x)
 end
 CompositeOperatorBasis(bases::OperatorBasis...) = CompositeOperatorBasis((bases...,))
 CompositeOperatorBasis(bases::Vector) = CompositeOperatorBasis((bases...,))
@@ -355,10 +337,10 @@ bases(b::CompositeOperatorBasis) = b.bases
 Typical "Ket-Bra" Basis.
 TODO: write more...
 """
-struct KetBraBasis{N,BL<:Basis,BR<:Basis} <: OperatorBasis{N}
+struct KetBraBasis{BL<:Basis,BR<:Basis} <: OperatorBasis
     left::BL
     right::BR
-    KetBraBasis(bl, br) = new{(length(bl), length(br)), typeof(bl), typeof(br)}(bl, br)
+    KetBraBasis(bl, br) = new{typeof(bl), typeof(br)}(bl, br)
 end
 left(b::KetBraBasis) = b.left
 right(b::KetBraBasis) = b.right
@@ -369,13 +351,12 @@ right(b::KetBraBasis) = b.right
 Unitary operator basis for a tensor product of modes number of dim_i-dimensional operator space in
 the clock-shift matrices.
 """
-struct HeisenbergWeylBasis{N,dims} <: UnitaryOperatorBasis{N}
-    HeisenbergWeylBasis(dims::Tuple{Integer}) =
-        new{(prod(dims),prod(dims)),dims}()
+struct HeisenbergWeylBasis{dims} <: UnitaryOperatorBasis
+    HeisenbergWeylBasis(dims::Tuple{Integer}) = new{dims}()
     # TODO: add ordering? i.e. symplectic form
 end
 HeisenbergWeylBasis(modes::Integer, dim::Integer) = HeisenbergWeylBasis(ntuple(i->dim, modes))
-dimensions(b::HeisenbergWeylBasis{N,dims}) where {N,dims} = dims
+dimensions(b::HeisenbergWeylBasis{dims}) where {dims} = dims
 
 """
     PauliBasis(num_qubits)
@@ -383,11 +364,11 @@ dimensions(b::HeisenbergWeylBasis{N,dims}) where {N,dims} = dims
 Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
 The dimension of the basis is 2ᴺ times 2ᴺ.
 """
-struct PauliBasis{N,modes} <: UnitaryOperatorBasis{N}
-    PauliBasis(modes::Integer) = new{(2^modes,2^modes),modes}()
+struct PauliBasis{modes} <: UnitaryOperatorBasis
+    PauliBasis(modes::Integer) = new{modes}()
     # TODO: add ordering? i.e. symplectic form
 end
-nsubsystems(b::PauliBasis{N,M}) where {N,M} = M
+nsubsystems(b::PauliBasis{modes}) where {modes} = modes
 
 """
     GaussianBasis(modes)
@@ -396,13 +377,12 @@ Operator basis in terms of Gaussians in phase space.
 cutoffs are number of Gaussian basis elements alllowed to be superposed...
 So normal Gaussian state formalism correspnods to one in each mode.
 """
-struct GaussianBasis{N,cutoffs} <: OperatorBasis{N}
-    GaussianBasis(cutoffs::Tuple{Integer}) =
-        new{(prod(cutoffs),prod(cutoffs)),cutoffs}()
+struct GaussianBasis{cutoffs} <: OperatorBasis
+    GaussianBasis(cutoffs::Tuple{Integer}) = new{cutoffs}()
     # TODO: add ordering? i.e. symplectic form
 end
 GaussianBasis(modes::Integer, cutoff::Integer) = GaussianBasis(ntuple(i->cutoff, modes))
-cutoffs(b::GaussianBasis{N,C}) where {N,C} = C
+cutoffs(b::GaussianBasis{cuts}) where {cuts} = cuts
 
 ##
 # Common super-operator bases
@@ -414,10 +394,10 @@ cutoffs(b::GaussianBasis{N,C}) where {N,C} = C
 Typical "KetKet-BraBra" SuperOperatorBasis.
 TODO: write more...
 """
-struct KetKetBraBraBasis{N,BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBasis{N}
+struct KetKetBraBraBasis{BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBasis
     left::BL
     right::BR
-    KetBraBasis(bl, br) = new{(length(bl), length(br)), typeof(bl), typeof(br)}(bl, br)
+    KetBraBasis(bl, br) = new{typeof(bl), typeof(br)}(bl, br)
 end
 left(b::KetKetBraBraBasis) = b.left
 right(b::KetKetBraBraBasis) = b.right

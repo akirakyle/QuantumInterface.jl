@@ -11,21 +11,20 @@ and only if an instance is a subtype of OperatorBasis{B,B} where {B <: Basis}.
 Furthermore all subtypes must implement `Base.length` which returns the dimension
 of the Hilbert space.
 
-Composite systems can be defined with help of the [`CompositeBasis`](@ref) class.
-
-N represents the underlying hilbert space, charicterized by it's dimensionality
+length() represents the underlying hilbert space, charicterized by it's dimensionality
 Subtypes can add more type parameters as needed...
-TODO: specify that it really should represent an orthornormal basis so that N is
+It really should represent an orthornormal basis so that length() is
 both the number of basis elements and size of Hilbert space
+
+== shoud be equality...
 
 subtypes all have function interface to access all relevant fields of each basis so
 downstream should only use that interface and not assume internal layout.
 see https://docs.julialang.org/en/v1/manual/style-guide/#Prefer-exported-methods-over-direct-field-access
 
-length() is total dimension of the Hilbert space.
-== shoud be equality...
+Composite systems can be defined with help of the [`CompositeBasis`](@ref) class.
 """
-abstract type Basis{N} end
+abstract type Basis end
 
 """
 Parametric composite type for all operator bases.
@@ -35,21 +34,27 @@ TODO: write this condition down explicitly.
 Examples include pauli or Heisenberg-Weyl bases as well as
 standard "ket-bra" basis
 
-N is two-tuple describing left and right hilbert space dimensions
+Must implement Base.size and which return a
+two-tuple describing left and right hilbert space dimensions
+
+== shoud be equality...
 
 See [TODO: reference operators.md in docs]
 """
-abstract type OperatorBasis{N} end
-abstract type UnitaryOperatorBasis{N} <: OperatorBasis{N} end
+abstract type OperatorBasis end
+abstract type UnitaryOperatorBasis <: OperatorBasis end
 
 """
 Parametric composite type for all superoperator bases.
 
-N is two-tuple of two-tuples describing left and right operator dimensions
+Must implement Base.size returning a two-tuple of
+two-tuples describing left and right operator dimensions
+
+== shoud be equality...
 
 See [TODO: reference superoperators.md in docs]
 """
-abstract type SuperOperatorBasis{N} end
+abstract type SuperOperatorBasis end
 
 """
 Exception that should be raised for an illegal algebraic operation.
