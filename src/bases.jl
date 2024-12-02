@@ -33,28 +33,6 @@ CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
 bases(b::CompositeBasis) = b.bases
 
 """
-    tensor(x::Basis, y::Basis, z::Basis...)
-
-Create a [`CompositeBasis`](@ref) from the given bases.
-
-Any given CompositeBasis is expanded so that the resulting CompositeBasis never
-contains another CompositeBasis.
-"""
-tensor(b::Basis) = CompositeBasis(b)
-tensor(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
-tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
-tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, bases(b2)...)
-tensor(bases::Basis...) = reduce(tensor, bases)
-
-function Base.:^(b::Basis, N::Integer)
-    if N < 1
-        throw(ArgumentError("Power of a basis is only defined for positive integers."))
-    end
-    tensor((b for i=1:N)...)
-end
-
-"""
     reduced(a, indices)
 
 Reduced basis, state or operator on the specified subsystems.
@@ -372,21 +350,6 @@ CompositeOperatorBasis(bases::Vector) = CompositeOperatorBasis((bases...,))
 bases(b::CompositeOperatorBasis) = b.bases
 
 """
-    tensor(x::Basis, y::Basis, z::Basis...)
-
-Create a [`CompositeBasis`](@ref) from the given bases.
-
-Any given CompositeBasis is expanded so that the resulting CompositeBasis never
-contains another CompositeBasis.
-"""
-tensor(b::OperatorBasis) = CompositeOperatorBasis(b)
-tensor(b1::OperatorBasis, b2::OperatorBasis) = CompositeOperatorBasis(b1, b2)
-tensor(b1::CompositeOperatorBasis, b2::CompositeOperatorBasis) = CompositeOperatorBasis(b1.bases..., b1.bases...)
-tensor(b1::CompositeOperatorBasis, b2::OperatorBasis) = CompositeOperatorBasis(b1.bases..., b2)
-tensor(b1::OperatorBasis, b2::CompositeOperatorBasis) = CompositeOperatorBasis(b1, b2.bases...)
-tensor(bases::OperatorBasis...) = reduce(tensor, bases)
-
-"""
     KetBraBasis(BL,BR)
 
 Typical "Ket-Bra" Basis.
@@ -399,10 +362,6 @@ struct KetBraBasis{N,BL<:Basis,BR<:Basis} <: OperatorBasis{N}
 end
 left(b::KetBraBasis) = b.left
 right(b::KetBraBasis) = b.right
-
-tensor(b::KetBraBasis) = b # TODO is this right?
-tensor(b1::KetBraBasis, b2::KetBraBasis) = KetBraBasis(b1.left⊗b2.left, b1.right⊗b2.right)
-tensor(bases::KetBraBasis...) = reduce(tensor, bases)
 
 """
     HeisenbergWeylBasis(modes, dim)
@@ -418,10 +377,6 @@ end
 HeisenbergWeylBasis(modes::Integer, dim::Integer) = HeisenbergWeylBasis(ntuple(i->dim, modes))
 dimensions(b::HeisenbergWeylBasis{N,dims}) where {N,dims} = dims
 
-tensor(b::HeisenbergWeylBasis) = b # TODO is this right?
-tensor(b1::HeisenbergWeylBasis, b2::HeisenbergWeylBasis) = HeisenbergWeylBasis(b1.dims..., b2.dims...)
-tensor(bases::HeisenbergWeylBasis...) = reduce(tensor, bases)
-
 """
     PauliBasis(num_qubits)
 
@@ -433,10 +388,6 @@ struct PauliBasis{N,modes} <: UnitaryOperatorBasis{N}
     # TODO: add ordering? i.e. symplectic form
 end
 nsubsystems(b::PauliBasis{N,M}) where {N,M} = M
-
-tensor(b::PauliBasis) = b # TODO is this right?
-tensor(b1::PauliBasis, b2::PauliBasis) = PauliBasis(b1.modes+b2.modes)
-tensor(bases::PauliBasis...) = reduce(tensor, bases)
 
 """
     GaussianBasis(modes)
@@ -452,11 +403,6 @@ struct GaussianBasis{N,cutoffs} <: OperatorBasis{N}
 end
 GaussianBasis(modes::Integer, cutoff::Integer) = GaussianBasis(ntuple(i->cutoff, modes))
 cutoffs(b::GaussianBasis{N,C}) where {N,C} = C
-
-tensor(b::GaussianBasis) = b # TODO is this right?
-tensor(b1::GaussianBasis, b2::GaussianBasis) = GaussianBasis(b1.dims..., b2.dims...)
-tensor(bases::GaussianBasis...) = reduce(tensor, bases)
-
 
 ##
 # Common super-operator bases
@@ -476,6 +422,3 @@ end
 left(b::KetKetBraBraBasis) = b.left
 right(b::KetKetBraBraBasis) = b.right
 
-tensor(b::KetKetBraBraBasis) = b # TODO is this right?
-tensor(b1::KetKetBraBraBasis, b2::KetKetBraBraBasis) = KetKetBraBraBasis(b1.left⊗b2.left, b1.right⊗b2.right)
-tensor(bases::KetKetBraBraBasis...) = reduce(tensor, bases)

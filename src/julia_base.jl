@@ -20,6 +20,14 @@ size(b::OperatorBasis{N}) where {N} = N
 ==(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
 size(b::SuperOperatorBasis{N}) where {N} = N
 
+function Base.:^(b::Basis, N::Integer)
+    if N < 1
+        throw(ArgumentError("Power of a basis is only defined for positive integers."))
+    end
+    tensor((b for i=1:N)...)
+end
+
+
 ##
 # States
 ##
