@@ -335,12 +335,18 @@ bases(b::CompositeOperatorBasis) = b.bases
     KetBraBasis(BL,BR)
 
 Typical "Ket-Bra" Basis.
-TODO: write more...
+nsubsystems(BL) must equal nsubsystems(BR) otherwise doesn't make sense...
+TODO: write more... 
 """
 struct KetBraBasis{BL<:Basis,BR<:Basis} <: OperatorBasis
     left::BL
     right::BR
-    KetBraBasis(bl, br) = new{typeof(bl), typeof(br)}(bl, br)
+    function KetBraBasis(bl, br)
+        if nsubsystems(bl) != nsubsystems(br)
+            throw(IncompatibleBases())
+        end
+        new{typeof(bl), typeof(br)}(bl, br)
+    end
 end
 left(b::KetBraBasis) = b.left
 right(b::KetBraBasis) = b.right
@@ -368,7 +374,7 @@ struct PauliBasis{modes} <: UnitaryOperatorBasis
     PauliBasis(modes::Integer) = new{modes}()
     # TODO: add ordering? i.e. symplectic form
 end
-nsubsystems(b::PauliBasis{modes}) where {modes} = modes
+# modes accessed with nsubsystems
 
 """
     GaussianBasis(modes)

@@ -8,10 +8,13 @@ traceout!(op::AbstractOperator, i) = ptrace(op,i)
 
 permutesystems(a::AbstractOperator, perm) = arithmetic_unary_error("Permutations of subsystems", a)
 
-nsubsystems(s::AbstractKet) = nsubsystems(basis(s))
-nsubsystems(b::CompositeBasis) = length(bases(b))
 nsubsystems(b::Basis) = 1
-nsubsystems(s::AbstractOperator) = nsubsystems(basis(s))
-# TODO: fixme to work with other composite bases like KetBraBasis...
+nsubsystems(b::CompositeBasis) = length(bases(b))
 nsubsystems(b::CompositeOperatorBasis) = length(bases(b))
+nsubsystems(b::KetBraBasis) = length(left(b))
+nsubsystems(b::HeisenbergWeylBasis{dims}) where {dims} = length(dims)
+nsubsystems(b::PauliBasis{modes}) where {modes} = modes
+
+nsubsystems(s::AbstractKet) = nsubsystems(basis(s))
+nsubsystems(s::AbstractOperator) = nsubsystems(basis(s))
 nsubsystems(::Nothing) = 1 # TODO Exists because of QuantumSavory; Consider removing this and reworking the functions that depend on it. E.g., a reason to have it when performing a project_traceout measurement on a state that contains only one subsystem
