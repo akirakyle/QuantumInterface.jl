@@ -8,9 +8,9 @@ contains another CompositeBasis.
 """
 tensor(b::Basis) = CompositeBasis(b)
 tensor(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
-tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
-tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, bases(b2)...)
+tensor(b1::CompositeBasis, b2::CompositeBasis) = CompositeBasis(b1.bases..., b2.bases...)
+tensor(b1::CompositeBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
+tensor(b1::Basis, b2::CompositeBasis) = CompositeBasis(b1, b2.bases...)
 tensor(bases::Basis...) = reduce(tensor, bases)
 
 """
@@ -67,7 +67,7 @@ Construct the [`SumBasis`](@ref) out of two sub-bases.
 """
 directsum(b::Basis) = CompositeBasis(b)
 directsum(b1::Basis, b2::Basis) = CompositeBasis(b1, b2)
-directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(bases(b1)..., bases(b2)...)
-directsum(b1::SumBasis, b2::Basis) = CompositeBasis(bases(b1)..., b2)
-directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, bases(b2)...)
+directsum(b1::SumBasis, b2::SumBasis) = CompositeBasis(b1.bases..., b2.bases...)
+directsum(b1::SumBasis, b2::Basis) = CompositeBasis(b1.bases..., b2)
+directsum(b1::Basis, b2::SumBasis) = CompositeBasis(b1, b2.bases...)
 directsum(bases::Basis...) = reduce(dicectsum, bases)

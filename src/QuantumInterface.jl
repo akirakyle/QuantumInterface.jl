@@ -15,8 +15,6 @@ Returns B where B<:SuperOperatorBasis for typeof(a)<:AbstractSuperOperator.
 """
 function basis end
 
-function bases end
-
 function spinnumber end
 
 function basisstates end
@@ -30,10 +28,6 @@ function cutoff_min end
 function cutoff_max end
 
 function offset end
-
-function left end
-
-function right end
 
 function cutoffs end
 

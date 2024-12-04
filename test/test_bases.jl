@@ -1,5 +1,5 @@
 using Test
-using QuantumInterface: tensor, ⊗, ptrace, bases, reduced, ptrace, permutesystems
+using QuantumInterface: tensor, ⊗, ptrace, reduced, ptrace, permutesystems
 using QuantumInterface: GenericBasis, CompositeBasis, SpinBasis, FockBasis
 
 N1 = 6
@@ -39,20 +39,20 @@ b3 = FockBasis(2)
 comp_b1 = tensor(b1, b2)
 comp_uni = b1 ⊗ b2
 comp_b2 = tensor(b1, b1, b2, b3)
-@test length.(bases(comp_b1)) == (6,2)
-@test length.(bases(comp_uni)) == (6,2)
-@test length.(bases(comp_b2)) == (6,6,2,3)
+@test size(comp_b1) == (6,2)
+@test size(comp_uni) == (6,2)
+@test size(comp_b2) == (6,6,2,3)
 
 @test b1^3 == CompositeBasis(b1, b1, b1)
 @test (b1⊗b2)^2 == CompositeBasis(b1, b2, b1, b2)
 @test_throws ArgumentError b1^(0)
 
 comp_b1_b2 = tensor(comp_b1, comp_b2)
-@test length.(bases(comp_b1_b2)) == (6,2,6,6,2,3)
+@test size(comp_b1_b2) == (6,2,6,6,2,3)
 @test comp_b1_b2 == CompositeBasis(b1, b2, b1, b1, b2, b3)
 
 @test_throws ArgumentError tensor()
-@test bases(comp_b2) == bases(tensor(b1, comp_b1, b3))
+@test comp_b2.bases == tensor(b1, comp_b1, b3).bases
 @test comp_b2 == tensor(b1, comp_b1, b3)
 
 @test_throws ArgumentError ptrace(comp_b1, [1, 2])

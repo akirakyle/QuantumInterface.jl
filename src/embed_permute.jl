@@ -6,8 +6,8 @@ specifies in which subsystems the corresponding operator is defined.
 """
 function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
                operators::Dict{<:Vector{<:Integer}, T}) where T<:AbstractOperator
-    @assert length(bases(basis_l)) == length(bases(basis_r))
-    N = length(bases(basis_l))::Int # type assertion to help type inference
+    @assert nsubsystems(basis_l) == nsubsystems(basis_r)
+    N = nsubsystems(basis_l)::Int # type assertion to help type inference
     if length(operators) == 0
         return identityoperator(T, basis_l, basis_r)
     end
@@ -21,14 +21,14 @@ function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
     if all(([minimum(I):maximum(I);]==I)::Bool for I in indices) # type assertion to help type inference
         for i in 1:N
             if i in complement_indices_flat
-                push!(operators_flat, identityoperator(T, S, bases(basis_l)[i], bases(basis_r)[i]))
+                push!(operators_flat, identityoperator(T, S, basis_l[i], basis_r[i]))
             elseif i in start_indices_flat
                 push!(operators_flat, operator_list[indexin(i, start_indices_flat)[1]])
             end
         end
         return tensor(operators_flat...)
     else
-        complement_operators = [identityoperator(T, S, bases(basis_l)[i], bases(basis_r)[i]) for i in complement_indices_flat]
+        complement_operators = [identityoperator(T, S, basis_l[i], basis_r[i]) for i in complement_indices_flat]
         op = tensor([operator_list; complement_operators]...)
         perm = sortperm([indices_flat; complement_indices_flat])
         return permutesystems(op, perm)
@@ -59,8 +59,8 @@ function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
 
     @assert check_embed_indices(indices)
 
-    N = length(bases(basis_l))
-    @assert length(bases(basis_r)) == N
+    N = nsubsystems(basis_l)
+    @assert nsubsystems(basis_r) == N
     @assert length(indices) == length(operators)
 
     # Embed all single-subspace operators.
@@ -69,12 +69,12 @@ function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
     ops_sb = [x[2] for x in idxop_sb]
 
     for (idxsb, opsb) in zip(indices_sb, ops_sb)
-        (opsb.basis_l == bases(basis_l)[idxsb]) || throw(IncompatibleBases())
-        (opsb.basis_r == bases(basis_r)[idxsb]) || throw(IncompatibleBases())
+        (opsb.basis_l == basis_l[idxsb]) || throw(IncompatibleBases())
+        (opsb.basis_r == basis_r[idxsb]) || throw(IncompatibleBases())
     end
 
     S = length(operators) > 0 ? mapreduce(eltype, promote_type, operators) : Any
-    embed_op = tensor([i ∈ indices_sb ? ops_sb[indexin(i, indices_sb)[1]] : identityoperator(T, S, bases(basis_l)[i], bases(basis_r)[i]) for i=1:N]...)
+    embed_op = tensor([i ∈ indices_sb ? ops_sb[indexin(i, indices_sb)[1]] : identityoperator(T, S, basis_l[i], basis_r[i]) for i=1:N]...)
 
     # Embed all joint-subspace operators.
     idxop_comp = [x for x in zip(indices, operators) if x[1] isa Array]

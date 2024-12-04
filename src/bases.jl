@@ -30,7 +30,6 @@ struct CompositeBasis{T<:Tuple{Vararg{Basis}}} <: Basis
 end
 CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
 CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
-bases(b::CompositeBasis) = b.bases
 
 """
     reduced(a, indices)
@@ -44,9 +43,9 @@ function reduced(b::CompositeBasis, indices)
     if length(indices)==0
         throw(ArgumentError("At least one subsystem must be specified in reduced."))
     elseif length(indices)==1
-        return bases(b)[indices[1]]
+        return b[indices[1]]
     else
-        return CompositeBasis(bases(b)[indices])
+        return CompositeBasis(b[indices])
     end
 end
 
@@ -61,7 +60,7 @@ smaller than the number of subsystems, i.e. it is not allowed to perform a
 full trace.
 """
 function ptrace(b::CompositeBasis, indices)
-    J = [i for i in 1:length(bases(b)) if i ∉ indices]
+    J = [i for i in 1:nsubsystems(b) if i ∉ indices]
     length(J) > 0 || throw(ArgumentError("Tracing over all indices is not allowed in ptrace."))
     reduced(b, J)
 end
@@ -76,9 +75,9 @@ For a permutation vector `[2,1,3]` and a given object with basis `[b1, b2, b3]`
 this function results in `[b2, b1, b3]`.
 """
 function permutesystems(b::CompositeBasis, perm)
-    @assert length(bases(b)) == length(perm)
+    @assert nsubsystems(b) == length(perm)
     @assert isperm(perm)
-    CompositeBasis(bases(b)[perm])
+    CompositeBasis(b[perm])
 end
 
 """
@@ -92,7 +91,6 @@ struct SumBasis{T<:Tuple{Vararg{Basis}}} <: Basis
 end
 SumBasis(bases::Basis...) = SumBasis((bases...,))
 SumBasis(bases::Vector) = SumBasis((bases...,))
-bases(b::SumBasis) = b.bases
 
 ##
 # Common finite bases
@@ -329,7 +327,6 @@ struct CompositeOperatorBasis{T<:Tuple{Vararg{OperatorBasis}}} <: OperatorBasis
 end
 CompositeOperatorBasis(bases::OperatorBasis...) = CompositeOperatorBasis((bases...,))
 CompositeOperatorBasis(bases::Vector) = CompositeOperatorBasis((bases...,))
-bases(b::CompositeOperatorBasis) = b.bases
 
 """
     KetBraBasis(BL,BR)
@@ -348,8 +345,7 @@ struct KetBraBasis{BL<:Basis,BR<:Basis} <: OperatorBasis
         new{typeof(bl), typeof(br)}(bl, br)
     end
 end
-left(b::KetBraBasis) = b.left
-right(b::KetBraBasis) = b.right
+
 
 """
     HeisenbergWeylBasis(modes, dim)
@@ -358,11 +354,11 @@ Unitary operator basis for a tensor product of modes number of dim_i-dimensional
 the clock-shift matrices.
 """
 struct HeisenbergWeylBasis{dims} <: UnitaryOperatorBasis
-    HeisenbergWeylBasis(dims::Tuple{Integer}) = new{dims}()
+    HeisenbergWeylBasis(dims::Integer) = new{dims}()
     # TODO: add ordering? i.e. symplectic form
 end
 HeisenbergWeylBasis(modes::Integer, dim::Integer) = HeisenbergWeylBasis(ntuple(i->dim, modes))
-dimensions(b::HeisenbergWeylBasis{dims}) where {dims} = dims
+#Maybe rely on compositebasis for this instead?
 
 """
     PauliBasis(num_qubits)
@@ -403,8 +399,11 @@ TODO: write more...
 struct KetKetBraBraBasis{BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBasis
     left::BL
     right::BR
-    KetBraBasis(bl, br) = new{typeof(bl), typeof(br)}(bl, br)
+    function KetKetBraBraBasis(bl, br)
+        if nsubsystems(bl) != nsubsystems(br)
+            throw(IncompatibleBases())
+        end
+        new{typeof(bl), typeof(br)}(bl, br)
+    end
 end
-left(b::KetKetBraBraBasis) = b.left
-right(b::KetKetBraBraBasis) = b.right
 
