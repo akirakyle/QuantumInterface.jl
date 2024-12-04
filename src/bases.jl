@@ -16,6 +16,7 @@ struct GenericBasis{N} <: Basis
     GenericBasis(N) = new{N}()
 end
 
+# TODO add something to disable compositing of basis for ChoiSubBasis..
 """
     CompositeBasis(b1, b2...)
 
@@ -61,7 +62,7 @@ smaller than the number of subsystems, i.e. it is not allowed to perform a
 full trace.
 """
 function ptrace(b::CompositeBasis, indices)
-    J = [i for i in 1:length(bases(b)) if i ∉ indices]
+    J = [i for i in 1:nsubsystems(b) if i ∉ indices]
     length(J) > 0 || throw(ArgumentError("Tracing over all indices is not allowed in ptrace."))
     reduced(b, J)
 end
@@ -76,7 +77,7 @@ For a permutation vector `[2,1,3]` and a given object with basis `[b1, b2, b3]`
 this function results in `[b2, b1, b3]`.
 """
 function permutesystems(b::CompositeBasis, perm)
-    @assert length(bases(b)) == length(perm)
+    @assert nsubsystems(b) == length(perm)
     @assert isperm(perm)
     CompositeBasis(bases(b)[perm])
 end
@@ -242,6 +243,7 @@ end
 cutoff(b::FockBasis{cut,off}) where {cut,off} = cut
 offset(b::FockBasis{cut,off}) where {cut,off} = off
 
+# rework these with the ordered list of points where they're defined??
 """
     PositionBasis(Npoints, xmin, xmax)
     PositionBasis(b::MomentumBasis)
@@ -335,21 +337,19 @@ bases(b::CompositeOperatorBasis) = b.bases
     KetBraBasis(BL,BR)
 
 Typical "Ket-Bra" Basis.
-nsubsystems(BL) must equal nsubsystems(BR) otherwise doesn't make sense...
+nsubsystems(BL) need not equal nsubsystems(BR)
+however for KetBra to represent a CompositeOperatorBasis over ketbra ⊗ ketbra ⊗ ...
+then they must be equal
 TODO: write more... 
 """
 struct KetBraBasis{BL<:Basis,BR<:Basis} <: OperatorBasis
     left::BL
     right::BR
     function KetBraBasis(bl, br)
-        if nsubsystems(bl) != nsubsystems(br)
-            throw(IncompatibleBases())
-        end
         new{typeof(bl), typeof(br)}(bl, br)
     end
 end
-left(b::KetBraBasis) = b.left
-right(b::KetBraBasis) = b.right
+bases(b::KetBraBasis) = (left=b.left, right=b.right)
 
 """
     HeisenbergWeylBasis(modes, dim)
@@ -405,6 +405,18 @@ struct KetKetBraBraBasis{BL<:KetBraBasis, BR<:KetBraBasis} <: SuperOperatorBasis
     right::BR
     KetBraBasis(bl, br) = new{typeof(bl), typeof(br)}(bl, br)
 end
-left(b::KetKetBraBraBasis) = b.left
-right(b::KetKetBraBraBasis) = b.right
+bases(b::KetKetBraBraBasis) = (left=b.left, right=b.right)
 
+
+"""
+    KetBraOperatorBasis(BL,BR)
+
+"Ket-Bra" but with SuperOperatorBasis.
+TODO: write more...
+"""
+struct KetBraOperatorBasis{BL<:OperatorBasis, BR<:OperatorBasis} <: SuperOperatorBasis
+    left::BL
+    right::BR
+    KetBraBasis(bl, br) = new{typeof(bl), typeof(br)}(bl, br)
+end
+bases(b::KetBraOperatorBasis) = (left=b.left, right=b.right)

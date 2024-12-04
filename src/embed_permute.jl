@@ -6,8 +6,8 @@ specifies in which subsystems the corresponding operator is defined.
 """
 function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
                operators::Dict{<:Vector{<:Integer}, T}) where T<:AbstractOperator
-    @assert length(bases(basis_l)) == length(bases(basis_r))
-    N = length(bases(basis_l))::Int # type assertion to help type inference
+    @assert nsubsystems(basis_l) == nsubsystems(basis_r)
+    N = nsubsystems(basis_l)::Int # type assertion to help type inference
     if length(operators) == 0
         return identityoperator(T, basis_l, basis_r)
     end
@@ -59,8 +59,8 @@ function embed(basis_l::CompositeBasis, basis_r::CompositeBasis,
 
     @assert check_embed_indices(indices)
 
-    N = length(bases(basis_l))
-    @assert length(bases(basis_r)) == N
+    N = nsubsystems(basis_l)
+    @assert nsubsystems(basis_r) == N
     @assert length(indices) == length(operators)
 
     # Embed all single-subspace operators.

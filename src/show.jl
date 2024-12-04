@@ -3,14 +3,14 @@ import Base: show, summary
 function summary(stream::IO, x::AbstractOperator)
     b = basis(x)
     print(stream, "$(typeof(x).name.name)(dim=$(size(b)[1])x$(size(b)[2]))\n")
-    if b isa KetBraBasis && left(b) == right(b)
+    if b isa KetBraBasis && bases(b).left == bases(b).right
         print(stream, "  basis: ")
-        show(stream, left(basis(b)))
+        show(stream, bases(b).left)
     elseif b isa KetBraBasis
         print(stream, "  basis left:  ")
-        show(stream, left(b))
+        show(stream, bases(b).left)
         print(stream, "\n  basis right: ")
-        show(stream, right(b))
+        show(stream, bases(b).right)
     else
         print(stream, "  basis: ")
         show(stream, basis(b))
@@ -30,9 +30,9 @@ end
 
 function show(stream::IO, x::CompositeBasis)
     write(stream, "[")
-    for i in 1:length(bases(x))
+    for i in 1:nsubsystems(x)
         show(stream, bases(x)[i])
-        if i != length(bases(x))
+        if i != nsubsystems(x)
             write(stream, " ⊗ ")
         end
     end

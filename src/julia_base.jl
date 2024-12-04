@@ -17,9 +17,19 @@ addnumbererror() = throw(ArgumentError("Can't add or subtract a number and an op
 ==(b1::T, b2::T) where {T<:SuperOperatorBasis} = true
 ==(b1::SuperOperatorBasis, b2::SuperOperatorBasis) = false
 
+nsubsystems(b::Basis) = 1
+nsubsystems(b::CompositeBasis) = length(bases(b))
+nsubsystems(b::CompositeOperatorBasis) = length(bases(b))
+nsubsystems(b::KetBraBasis) = length(left(b))
+nsubsystems(b::HeisenbergWeylBasis{dims}) where {dims} = length(dims)
+nsubsystems(b::PauliBasis{modes}) where {modes} = modes
+
+nsubsystems(s::AbstractKet) = nsubsystems(basis(s))
+nsubsystems(s::AbstractOperator) = nsubsystems(basis(s))
+nsubsystems(::Nothing) = 1 # TODO Exists because of QuantumSavory; Consider removing this and reworking the functions that depend on it. E.g., a reason to have it when performing a project_traceout measurement on a state that contains only one subsystem
+
 length(b::GenericBasis{N}) where {N} = N
-size(b::CompositeBasis) = length.(bases(b))
-length(b::CompositeBasis) = prod(size(b))
+length(b::CompositeBasis) = prod(length.(bases(b)))
 length(b::SumBasis) = sum(length.(bases(x)))
 length(b::NLevelBasis{N}) where N = N
 length(b::SpinBasis) = numerator(2*spinnumber(b) + 1)
@@ -31,12 +41,15 @@ length(b::FockBasis) = cutoff(b) - offset(b) + 1
 length(b::PositionBasis{N}) where N = N
 length(b::MomentumBasis{N}) where N = N
 length(b::CoherentStateBasis{N}) where N = N
+
+#size(b::CompositeBasis) = length.(bases(b))
+
 size(b::CompositeOperatorBasis) = reduce(((N1,M1), (N2,M2)) -> (N1*N2, M2*M2), bases(b); init=(1,1))
-size(b::KetBraBasis) = (length(left(b)), length(right(b)))
+size(b::KetBraBasis) = (length(b.left), length(b.right))
 size(b::HeisenbergWeylBasis) = (d = dimensions(b); (prod(d),prod(d)))
 size(b::PauliBasis) = (n = nsubsystems(b); (2^n, 2^n))
 size(b::GaussianBasis) = (c = cutoffs(b); (prod(c),prod(c)))
-size(b::KetKetBraBraBasis) = (size(left(b)), size(right(b)))
+size(b::KetKetBraBraBasis) = (size(b.left), size(b.right))
 
 function Base.:^(b::Basis, N::Integer)
     if N < 1

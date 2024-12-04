@@ -31,10 +31,6 @@ function cutoff_max end
 
 function offset end
 
-function left end
-
-function right end
-
 function cutoffs end
 
 
