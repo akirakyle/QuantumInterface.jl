@@ -1,5 +1,10 @@
 # News
 
+## v0.4.0 - 2024-12-10
+
+- Add `OperatorBasis` and `SuperOperatorBasis` abstract types along with corresponding `fullbasis` function to obtain these from instances of subtypes of `AbstractOperator` and `AbstractSuperOperator`.
+- Change type parameters for `StateVector`, `AbstractKet` `AbstractBra` `AbstractOperator` `AbstractSuperOperator` to elimitate all type parameters.
+
 ## v0.3.7 - 2024-12-05
 
 - Deprecate `equal_bases`.
