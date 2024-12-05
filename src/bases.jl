@@ -42,6 +42,7 @@ end
 CompositeBasis(bases) = CompositeBasis([length(b) for b ∈ bases], bases)
 CompositeBasis(bases::Basis...) = CompositeBasis((bases...,))
 CompositeBasis(bases::Vector) = CompositeBasis((bases...,))
+bases(b::CompositeBasis) = b.bases
 
 Base.:(==)(b1::T, b2::T) where T<:CompositeBasis = equal_shape(b1.shape, b2.shape)
 
@@ -87,6 +88,8 @@ struct FockBasis{T} <: Basis
         new{T}([N-offset+1], N, offset)
     end
 end
+cutoff(b::FockBasis) = b.N
+offset(b::FockBasis) = b.offset
 
 Base.:(==)(b1::FockBasis, b2::FockBasis) = (b1.N==b2.N && b1.offset==b2.offset)
 
@@ -108,24 +111,6 @@ struct NLevelBasis{T} <: Basis
 end
 
 Base.:(==)(b1::NLevelBasis, b2::NLevelBasis) = b1.N == b2.N
-
-"""
-    PauliBasis(num_qubits::Int)
-
-Basis for an N-qubit space where `num_qubits` specifies the number of qubits.
-The dimension of the basis is 2²ᴺ.
-"""
-struct PauliBasis{S,B} <: Basis
-    shape::S
-    bases::B
-    function PauliBasis(num_qubits::T) where {T<:Integer}
-        shape = [2 for _ in 1:num_qubits]
-        bases = Tuple(SpinBasis(1//2) for _ in 1:num_qubits)
-        return new{typeof(shape),typeof(bases)}(shape, bases)
-    end
-end
-
-Base.:(==)(pb1::PauliBasis, pb2::PauliBasis) = length(pb1.bases) == length(pb2.bases)
 
 """
     SpinBasis(n)
@@ -150,6 +135,7 @@ struct SpinBasis{S,T} <: Basis
 end
 SpinBasis(spinnumber::Rational) = SpinBasis{spinnumber}(spinnumber)
 SpinBasis(spinnumber) = SpinBasis(convert(Rational{Int}, spinnumber))
+spinnumber(b::SpinBasis) = b.spinnumber
 
 Base.:(==)(b1::SpinBasis, b2::SpinBasis) = b1.spinnumber==b2.spinnumber
 
@@ -171,3 +157,37 @@ SumBasis(bases::Basis...) = SumBasis((bases...,))
 Base.:(==)(b1::T, b2::T) where T<:SumBasis = equal_shape(b1.shape, b2.shape)
 Base.:(==)(b1::SumBasis, b2::SumBasis) = false
 Base.length(b::SumBasis) = sum(b.shape)
+
+##
+# Operator Bases
+##
+
+"""
+    KetBraBasis(BL,BR)
+
+Typical "Ket-Bra" outter-product Basis.
+TODO: write more... 
+"""
+struct KetBraBasis <: Basis
+    left::Basis
+    right::Basis
+end
+basis_l(b::KetBraBasis) = b.left
+basis_r(b::KetBraBasis) = b.right
+
+"""
+    PauliBasis()
+
+Pauly operator basis consisting of I, Z, X, Y, in that order.
+"""
+struct PauliBasis{S,B} <: Basis
+    shape::S
+    bases::B
+    function PauliBasis(num_qubits::T) where {T<:Integer}
+        shape = [2 for _ in 1:num_qubits]
+        bases = Tuple(SpinBasis(1//2) for _ in 1:num_qubits)
+        return new{typeof(shape),typeof(bases)}(shape, bases)
+    end
+end
+
+Base.:(==)(pb1::PauliBasis, pb2::PauliBasis) = length(pb1.bases) == length(pb2.bases)

@@ -5,12 +5,12 @@
 const BASES_CHECK = Ref(true)
 
 """
-    @samebases
+    @compatiblebases
 
-Macro to skip checks for same bases. Useful for `*`, `expect` and similar
+Macro to skip checks for compatible bases. Useful for `*`, `expect` and similar
 functions.
 """
-macro samebases(ex)
+macro compatiblebases(ex)
     return quote
         BASES_CHECK.x = false
         local val = $(esc(ex))
@@ -19,62 +19,34 @@ macro samebases(ex)
     end
 end
 
-"""
-    samebases(a, b)
-
-Test if two objects have the same bases.
-"""
-samebases(b1::Basis, b2::Basis) = b1==b2
-samebases(b1::Tuple{Basis, Basis}, b2::Tuple{Basis, Basis}) = b1==b2 # for checking superoperators
-
-"""
-    check_samebases(a, b)
-
-Throw an [`IncompatibleBases`](@ref) error if the objects don't have
-the same bases.
-"""
-function check_samebases(b1, b2)
-    if BASES_CHECK[] && !samebases(b1, b2)
+function check_addible(b1, b2)
+    if BASES_CHECK[] && !addible(b1, b2)
         throw(IncompatibleBases())
     end
 end
 
-
-"""
-    multiplicable(a, b)
-
-Check if two objects are multiplicable.
-"""
-multiplicable(b1::Basis, b2::Basis) = b1==b2
-
-function multiplicable(b1::CompositeBasis, b2::CompositeBasis)
-    if !equal_shape(b1.shape,b2.shape)
-        return false
-    end
-    for i=1:length(b1.shape)
-        if !multiplicable(b1.bases[i], b2.bases[i])
-            return false
-        end
-    end
-    return true
-end
-
-"""
-    check_multiplicable(a, b)
-
-Throw an [`IncompatibleBases`](@ref) error if the objects are
-not multiplicable.
-"""
 function check_multiplicable(b1, b2)
     if BASES_CHECK[] && !multiplicable(b1, b2)
         throw(IncompatibleBases())
     end
 end
 
-samebases(a::AbstractOperator) = samebases(a.basis_l, a.basis_r)::Bool # FIXME issue #12
-samebases(a::AbstractOperator, b::AbstractOperator) = samebases(a.basis_l, b.basis_l)::Bool && samebases(a.basis_r, b.basis_r)::Bool # FIXME issue #12
-check_samebases(a::Union{AbstractOperator, AbstractSuperOperator}) = check_samebases(a.basis_l, a.basis_r) # FIXME issue #12
-multiplicable(a::AbstractOperator, b::AbstractOperator) = multiplicable(a.basis_r, b.basis_l) # FIXME issue #12
+addible(a::AbstractQObjType, b::AbstractQObjType) = false
+addible(a::AbstractBra, b::AbstractBra) = (basis(a) == basis(b))
+addible(a::AbstractKet, b::AbstractKet) = (basis(a) == basis(b))
+addible(a::AbstractOperator, b::AbstractOperator) =
+    (basis_l(a) == basis_l(b)) && (basis_r(a) == basis_r(b))
+
+multiplicable(a::AbstractQObjType, b::AbstractQObjType) = false
+multiplicable(a::AbstractBra, b::AbstractKet) = (basis(a) == basis(b))
+multiplicable(a::AbstractOperator, b::AbstractKet) = (basis_r(a) == basis(b))
+multiplicable(a::AbstractBra, b::AbstractOperator) = (basis(a) == basis_l(b))
+multiplicable(a::AbstractOperator, b::AbstractOperator) = (basis_r(a) == basis_l(b))
+
+basis(a::StateVector) = throw(ArgumentError("basis() is not defined for this type of state vector: $(typeof(op))."))
+basis_l(a::AbstractOperator) = throw(ArgumentError("basis_l() is not defined for this type of operator: $(typeof(op))."))
+basis_r(a::AbstractOperator) = throw(ArgumentError("basis_r() is not defined for this type of operator: $(typeof(op))."))
+basis(a::AbstractOperator) = (basis_l(a) == basis_r(a); basis_l(a))
 
 ##
 # tensor, reduce, ptrace
