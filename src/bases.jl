@@ -65,23 +65,6 @@ function equal_shape(a, b)
     return true
 end
 
-"""
-    equal_bases(a, b)
-
-Check if two subbases vectors are identical.
-"""
-function equal_bases(a, b)
-    if a===b
-        return true
-    end
-    for i=1:length(a)
-        if a[i]!=b[i]
-            return false
-        end
-    end
-    return true
-end
-
 ##
 # Common bases
 ##
@@ -126,7 +109,6 @@ end
 
 Base.:(==)(b1::NLevelBasis, b2::NLevelBasis) = b1.N == b2.N
 
-
 """
     PauliBasis(num_qubits::Int)
 
@@ -144,7 +126,6 @@ struct PauliBasis{S,B} <: Basis
 end
 
 Base.:(==)(pb1::PauliBasis, pb2::PauliBasis) = length(pb1.bases) == length(pb2.bases)
-
 
 """
     SpinBasis(n)
