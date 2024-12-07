@@ -23,7 +23,7 @@ If an `index` is given, it assumes that `op` is defined in the subsystem specifi
 variance(indices, op::AbstractOperator, state::AbstractOperator) =
     variance(op, ptrace(state, complement(nsubsystems(state), indices)))
 
-variance(index::Integer, op::AbstractOperator{B,B}, state::AbstractOperator{BC,BC}) where {B,BC<:CompositeBasis} = variance([index], op, state)
+variance(index::Integer, op::AbstractOperator, state::AbstractOperator) = variance([index], op, state)
 
 variance(op::AbstractOperator, states::Vector) = [variance(op, state) for state=states]
 

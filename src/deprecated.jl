@@ -40,10 +40,12 @@ function check_samebases(b1, b2)
     end
 end
 
+"""
 function check_samebases(a::Union{AbstractOperator, AbstractSuperOperator})
     Base.depwarn("`check_issquare` should be preferred over `check_samebases(a::Union{AbstractOperator, AbstractSuperOperator})`!", :check_samebases)
     check_samebases(a.basis_l, a.basis_r) # FIXME issue #12
 end
+"""
 
 function multiplicable(b1::Basis, b2::Basis)
     Base.depwarn("`==` should be preferred over `multiplicable(b1::Basis, b2::Basis)`!", :multiplicable)
@@ -63,4 +65,4 @@ function multiplicable(b1::CompositeBasis, b2::CompositeBasis)
     return true
 end
 
-Base.@deprecate @samebases(ex) @compatiblebases(ex) false
+#Base.@deprecate @samebases(ex) @compatiblebases(ex) false
