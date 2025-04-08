@@ -1,4 +1,20 @@
 """
+Abstract type for all specialized bases of a Hilbert space.
+
+This type specifies an orthonormal basis for the Hilbert space of the given
+system. All subtypes must implement `Base.:(==)` and `Base.length`, where the
+latter should return the total dimension of the Hilbert space
+
+Composite systems can be defined with help of [`CompositeBasis`](@ref).
+
+All relevant properties of concrete subtypes of `Basis` defined in
+`QuantumInterface` should be accessed using their documented functions and
+should not assume anything about the internal representation of instances of
+these types (i.e. do not access the fields of the structs directly).
+"""
+abstract type Basis end
+
+"""
 Abstract type for all state vectors.
 
 This type represents any abstract pure quantum state as given by an element of a
@@ -48,20 +64,3 @@ implemented. Many other generic multiplication functions can be defined in terms
 of this function and are provided automatically.
 """
 abstract type AbstractOperator end
-
-function summary(stream::IO, x::AbstractOperator)
-    print(stream, "$(typeof(x).name.name)(dim=$(length(x.basis_l))x$(length(x.basis_r)))\n")
-    if multiplicable(x,x)
-        print(stream, "  basis: ")
-        show(stream, basis(x))
-    else
-        print(stream, "  basis left:  ")
-        show(stream, x.basis_l)
-        print(stream, "\n  basis right: ")
-        show(stream, x.basis_r)
-    end
-end
-
-show(stream::IO, x::AbstractOperator) = summary(stream, x)
-
-traceout!(s::StateVector, i) = ptrace(s,i)
