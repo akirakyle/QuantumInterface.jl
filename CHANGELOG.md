@@ -1,5 +1,9 @@
 # News
 
+## v0.3.10 - 2025-04-19
+
+- Introduce `superoperators.jl` file for superoperator declarations.
+
 ## v0.3.9 - 2025-04-20
 
 - Improvements to implementation of `entropy_vn`.
