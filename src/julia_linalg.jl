@@ -3,7 +3,7 @@
 
 Check if an operator is Hermitian.
 """
-ishermitian(op::AbstractOperator) = arithmetic_unary_error(ishermitian, op)
+ishermitian(op::Union{AbstractOperator, AbstractChannel}) = arithmetic_unary_error(ishermitian, op)
 
 """
     tr(x::AbstractOperator)

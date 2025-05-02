@@ -59,37 +59,6 @@ Base.broadcastable(x::AbstractOperator) = Ref(x)
 ^(a::AbstractOperator, b::Integer) = Base.power_by_squaring(a, b)
 
 """
-    addible(a, b)
-
-Check if any two subtypes of `StateVector` or `AbstractOperator`
- can be added together.
-
-Spcefically this checks whether the left basis of a is equal
-to the left basis of b and whether the right basis of a is equal
-to the right basis of b.
-"""
-addible(a::Union{<:StateVector,<:AbstractOperator},
-        b::Union{<:StateVector,<:AbstractOperator}) = false
-addible(a::AbstractBra, b::AbstractBra) = (basis(a) == basis(b))
-addible(a::AbstractKet, b::AbstractKet) = (basis(a) == basis(b))
-addible(a::AbstractOperator, b::AbstractOperator) =
-    (basis_l(a) == basis_l(b)) && (basis_r(a) == basis_r(b))
-
-
-"""
-    multiplicable(a, b)
-
-Check if any two subtypes of `StateVector` or `AbstractOperator`,
-can be multiplied in the given order.
-"""
-multiplicible(a::Union{<:StateVector,<:AbstractOperator},
-              b::Union{<:StateVector,<:AbstractOperator}) = false
-multiplicable(a::AbstractBra, b::AbstractKet) = (basis(a) == basis(b))
-multiplicable(a::AbstractOperator, b::AbstractKet) = (basis_r(a) == basis(b))
-multiplicable(a::AbstractBra, b::AbstractOperator) = (basis(a) == basis_l(b))
-multiplicable(a::AbstractOperator, b::AbstractOperator) = (basis_r(a) == basis_l(b))
-
-"""
     exp(op::AbstractOperator)
 
 Operator exponential.

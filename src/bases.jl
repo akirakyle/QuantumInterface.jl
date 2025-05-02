@@ -1,3 +1,37 @@
+abstract type Space{T} end
+
+struct KetSpace{T} <: Space{T}
+    b::StateBasis
+    function QOSpace{T}(b::B) where B
+        new{T,B}(b)
+    end
+end
+Base.:(==)(s1::KetSpace, s2::KetSpace) = s1.b == s2.b
+struct BraSpace{T} <: StateSpace{T}
+    b::StateBasis
+    function BraSpace{T}(b::B) where B
+        new{T,B}(b)
+    end
+end
+Base.:(==)(s1::BraSpace, s2::BraSpace) = s1.b == s2.b
+struct OperatorSpace{T} <: OperatorSpace{T}
+    bl::StateBasis
+    br::StateBasis
+    function OperatorSpace{T}(bl::BL, br::BR) where {BL,BR}
+        new{T,B}(bl,br)
+    end
+end
+Base.:(==)(s1::OperatorSpace, s2::OperatorSpace) = s1.bl == s2.bl && s1.br == s2.br
+
+abstract type ChannelSpace{T} end
+
+"""
+    space(a)
+
+Return the space of a quantum object.
+"""
+function space end
+
 """
 Abstract type for all specialized bases of a Hilbert space.
 
@@ -16,33 +50,15 @@ these types (i.e. do not access the fields of the structs directly).
 """
 abstract type Basis end
 
+abstract type StateBasis <: Basis end
 abstract type OperatorBasis <: Basis end
 
-"""
-    basis(a)
-
-Return the basis of a quantum object.
-
-If it's ambiguous, e.g. if an operator has a different left and right basis, an
-[`IncompatibleBases`](@ref) error is thrown.
-
-See [`StateVector`](@ref) and [`AbstractOperator`](@ref)
-"""
-function basis end
-
-"""
-    basis_l(a)
-
-Return the left basis of an operator.
-"""
-function basis_l end
-
-"""
-    basis_r(a)
-
-Return the right basis of an operator.
-"""
-function basis_r end
+# TODO: try doing the space thing here that I was trying in quantumsymbolics
+# basically instead of calling basis{,_l,_r} on subtypes of Abstract{Ket,Bra,Operator}
+# just have a space function returns a KetSpace, BraSpace, OperatorSpace, maybe also
+# with a type saying what the explicit representation in that space is (like sparse vs dense)
+# taking inspiration from the parent function of AbstractAlgebra
+# also take instpiration by giving constructors like KetSpace(...)
 
 """
     length(b::Basis)
@@ -113,7 +129,7 @@ Stores the subbases in a vector and creates the shape vector directly from the
 dimensions of these subbases. Instead of creating a CompositeBasis directly,
 `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` should be used.
 """
-struct CompositeBasis{B<:Basis} <: Basis
+struct CompositeBasis{B<:Basis} <: StateBasis
     bases::Vector{B}
     shape::Vector{Int}
     lengths::Vector{Int}
@@ -193,7 +209,7 @@ Base.:^(b::Basis, N::Integer) = tensor_pow(b, N)
 
 Similar to [`CompositeBasis`](@ref) but for the [`directsum`](@ref) (⊕)
 """
-struct SumBasis{S<:Integer,B<:Basis} <: Basis
+struct SumBasis{S<:Integer,B<:Basis} <: StateBasis
     shape::Vector{S}
     bases::Vector{B}
 end
@@ -283,6 +299,20 @@ function check_samebases(b1, b2)
 end
 
 """
+    addible(a, b)
+
+Check if any two subtypes of `StateVector` or `AbstractOperator`
+ can be added together.
+
+Spcefically this checks whether the left basis of a is equal
+to the left basis of b and whether the right basis of a is equal
+to the right basis of b.
+"""
+addible(a::Space, b::Space) = a == b
+
+add_space(a::Space, b::Space)
+
+"""
     check_addible(a, b)
 
 Throw an [`IncompatibleBases`](@ref) error if the objects are not addible as
@@ -307,6 +337,23 @@ function check_multiplicable(a, b)
         throw(IncompatibleBases())
     end
 end
+
+"""
+    multiplicable(a, b)
+
+Check if any two subtypes of `StateVector` or `AbstractOperator`,
+can be multiplied in the given order.
+"""
+multiplicable(a::AbstractOperator, b::AbstractOperator) = (basis_r(a) == basis_l(b))
+
+multiplicable(a::QOSpace, b::QOSpace = false
+multiplicable(a::QOSpace{T}, b::QOSpace{S}) where T = basis(a) == basis(b)
+
+_mul_type(A::Type{<:AbstractBra}, B::Type{<:AbstractKet}) = Number
+_mul_type(A::Type{<:AbstractKet}, B::Type{<:AbstractBra}) = AbstractOperator
+_mul_type(A::Type{<:AbstractKet}, B::Type{<:AbstractBra}) = AbstractOperator
+
+
 
 """
     reduced(a, indices)
@@ -373,7 +420,7 @@ state (default is 0). Note that the dimension of this basis is `N+1-offset`.
 The [`cutoff`](@ref) and [`offset`](@ref) functions can be used to obtain the
 respective properties of a given `FockBasis`.
 """
-struct FockBasis{T<:Integer} <: Basis
+struct FockBasis{T<:Integer} <: StateBasis
     N::T
     offset::T
     function FockBasis(N::T,offset::T=0) where T
@@ -411,7 +458,7 @@ offset(b::FockBasis) = b.offset
 
 Basis for a system consisting of N states.
 """
-struct NLevelBasis{T<:Integer} <: Basis
+struct NLevelBasis{T<:Integer} <: StateBasis
     N::T
     function NLevelBasis(N::T) where T
         N > 0 || throw(ArgumentError("N must be greater than 0"))
@@ -432,7 +479,7 @@ e.g. `SpinBasis(3//2)`. The Pauli operators are defined for all possible spin
 numbers. The [`spinnumber`](@ref) function can be used to get the spin number
 for a `SpinBasis`.
 """
-struct SpinBasis{T<:Integer} <: Basis
+struct SpinBasis{T<:Integer} <: StateBasis
     spinnumber::Rational{T}
     D::T
     N::T

@@ -12,7 +12,7 @@ vec(op::AbstractOperator) = throw(ArgumentError("vec() is not defined for this t
 
 Converta a vectorized operator to a normal operator.
 """
-unvec(op::AbstractKet) = throw(ArgumentError("unvec() is not defined for this type of operator: $(typeof(op))."))
+unvec(op::Union{AbstractSuperKet, AbstractSuperBra}) = throw(ArgumentError("unvec() is not defined for this type of operator: $(typeof(op))."))
 
 """
     super(op)
