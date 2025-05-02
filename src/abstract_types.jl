@@ -56,7 +56,7 @@ abstract type AbstractSuperBra <: OperatorVector end
 abstract type AbstractChannel end
 abstract type AbstractSuperOperator <: AbstractChannel end
 abstract type AbstractChoiState <: AbstractChannel end
-abstract type AbstractKrausOpSum <: AbstractChannel end
+abstract type AbstractKraus <: AbstractChannel end
 abstract type AbstractStinespring <: AbstractChannel end
 
 function summary(stream::IO, x::AbstractOperator)

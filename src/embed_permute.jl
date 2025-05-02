@@ -67,8 +67,8 @@ function embed(bl::Basis, br::Basis,
     ops_sb = [x[2] for x in idxop_sb]
 
     for (idxsb, opsb) in zip(indices_sb, ops_sb)
-        (basis_l(opsb) == bl[idxsb]) || throw(IncompatibleBases())
-        (basis_r(opsb) == br[idxsb]) || throw(IncompatibleBases())
+        (space(opsb).bl == bl[idxsb]) || throw(IncompatibleBases())
+        (space(opsb).bl == br[idxsb]) || throw(IncompatibleBases())
     end
 
     S = length(operators) > 0 ? mapreduce(eltype, promote_type, operators) : Any

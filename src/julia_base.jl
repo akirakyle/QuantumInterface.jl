@@ -8,13 +8,16 @@ addnumbererror() = throw(ArgumentError("Can't add or subtract a number and an op
 # States
 ##
 
+
 ==(a::AbstractKet, b::AbstractBra) = false
 ==(a::AbstractBra, b::AbstractKet) = false
 -(a::T) where {T<:StateVector} = T(basis(a), -a.data) # FIXME issue #12
 *(a::StateVector, b::Number) = b*a
 copy(a::T) where {T<:StateVector} = T(basis(a), copy(a.data)) # FIXME issue #12
-length(a::StateVector) = dimension(basis(a))::Int
-basis(a::StateVector) = throw(ArgumentError("basis() is not defined for this type of state vector: $(typeof(a))."))
+length(a::StateVector) = dimension(space(a))
+space(a::StateVector) = throw(ArgumentError("space() is not defined for this type of state vector: $(typeof(a))."))
+basis(a::AbstractKet) = space(a).b # TODO check if right is TrivialBasis?
+basis(a::AbstractBra) = space(a).b # TODO check if right is TrivialBasis?
 directsum(x::StateVector...) = reduce(directsum, x)
 
 # Array-like functions
@@ -35,10 +38,9 @@ dagger(a::StateVector) = arithmetic_unary_error("Hermitian conjugate", a)
 # Operators
 ##
 
-length(a::AbstractOperator) = dimension(basis_l(a))::Int*dimension(basis_r(a))::Int
-basis(a::AbstractOperator) = (check_samebases(basis_l(a), basis_r(a)); basis_l(a))
-basis_l(a::AbstractOperator) = throw(ArgumentError("basis_l() is not defined for this type of operator: $(typeof(a))."))
-basis_r(a::AbstractOperator) = throw(ArgumentError("basis_r() is not defined for this type of operator: $(typeof(a))."))
+space(a::AbstractOperator) = throw(ArgumentError("space() is not defined for this type of operator: $(typeof(a))."))
+length(a::AbstractOperator) = dimension(space(a))
+basis(a::AbstractOperator) = (check_samebases(space(a).bl, space(a).br); space(a).bl)
 directsum(a::AbstractOperator...) = reduce(directsum, a)
 
 # Ensure scalar broadcasting
@@ -69,7 +71,7 @@ Base.size(op::AbstractOperator) = (dimension(basis_l(op)),dimension(basis_r(op))
 function Base.size(op::AbstractOperator, i::Int)
     i < 1 && throw(ErrorException("dimension index is < 1"))
     i > 2 && return 1
-    i==1 ? dimension(basis_l(op)) : dimension(basis_r(op))
+    i==1 ? dimension(space(op).bl) : dimension(space(op).br)
 end
 
 Base.adjoint(a::AbstractOperator) = dagger(a)

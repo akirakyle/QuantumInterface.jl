@@ -1,37 +1,3 @@
-abstract type Space{T} end
-
-struct KetSpace{T} <: Space{T}
-    b::StateBasis
-    function QOSpace{T}(b::B) where B
-        new{T,B}(b)
-    end
-end
-Base.:(==)(s1::KetSpace, s2::KetSpace) = s1.b == s2.b
-struct BraSpace{T} <: StateSpace{T}
-    b::StateBasis
-    function BraSpace{T}(b::B) where B
-        new{T,B}(b)
-    end
-end
-Base.:(==)(s1::BraSpace, s2::BraSpace) = s1.b == s2.b
-struct OperatorSpace{T} <: OperatorSpace{T}
-    bl::StateBasis
-    br::StateBasis
-    function OperatorSpace{T}(bl::BL, br::BR) where {BL,BR}
-        new{T,B}(bl,br)
-    end
-end
-Base.:(==)(s1::OperatorSpace, s2::OperatorSpace) = s1.bl == s2.bl && s1.br == s2.br
-
-abstract type ChannelSpace{T} end
-
-"""
-    space(a)
-
-Return the space of a quantum object.
-"""
-function space end
-
 """
 Abstract type for all specialized bases of a Hilbert space.
 
@@ -48,7 +14,7 @@ All relevant properties of concrete subtypes of `Basis` defined in
 should not assume anything about the internal representation of instances of
 these types (i.e. do not access the fields of the structs directly).
 """
-abstract type Basis end
+abstract type Basis <: Space end
 
 abstract type StateBasis <: Basis end
 abstract type OperatorBasis <: Basis end
@@ -104,6 +70,9 @@ shape(b::Basis) = [dimension(b[i]) for i=1:length(b)]
 ##
 # GenericBasis, CompositeBasis, SumBasis
 ##
+
+struct TrivialBasis() <: Basis
+end
 
 """
     GenericBasis(N)
@@ -309,8 +278,7 @@ to the left basis of b and whether the right basis of a is equal
 to the right basis of b.
 """
 addible(a::Space, b::Space) = a == b
-
-add_space(a::Space, b::Space)
+add_space(a::Space, b::Space) = a
 
 """
     check_addible(a, b)
@@ -323,7 +291,26 @@ function check_addible(a, b)
     if BASES_CHECK[] && !addible(a, b)
         throw(IncompatibleBases())
     end
+    add_space(a, b)
 end
+
+"""
+    multiplicable(a, b)
+
+Check if any two subtypes of `StateVector` or `AbstractOperator`,
+can be multiplied in the given order.
+"""
+multiplicable(a::Space, b::Space) = false
+multiplicable(a::KetSpace, b::BraSpace) = true
+multiplicable(a::BraSpace, b::KetSpace) = a.b == b.b
+multiplicable(a::OperatorSpace, b::KetSpace) = a.right == b.b
+multiplicable(a::BraSpace, b::OperatorSpace) = a.b == b.left
+multiplicable(a::OperatorSpace, b::OperatorSpace) = a.right == b.left
+mul_space(a::KetSpace, b::BraSpace) = OperatorSpace(a.b, b.b)
+mul_space(a::BraSpace, b::KetSpace) = KetSpace(TrivialBasis())
+mul_space(a::OperatorSpace, b::KetSpace) = KetSpace(a.left)
+mul_space(a::BraSpace, b::OperatorSpace) = BraSpace(b.right)
+mul_space(a::OperatorSpace, b::OperatorSpace) = Space(a.left, b.right)
 
 """
     check_multiplicable(a, b)
@@ -336,24 +323,8 @@ function check_multiplicable(a, b)
     if BASES_CHECK[] && !multiplicable(a, b)
         throw(IncompatibleBases())
     end
+    mul_space(a, b)
 end
-
-"""
-    multiplicable(a, b)
-
-Check if any two subtypes of `StateVector` or `AbstractOperator`,
-can be multiplied in the given order.
-"""
-multiplicable(a::AbstractOperator, b::AbstractOperator) = (basis_r(a) == basis_l(b))
-
-multiplicable(a::QOSpace, b::QOSpace = false
-multiplicable(a::QOSpace{T}, b::QOSpace{S}) where T = basis(a) == basis(b)
-
-_mul_type(A::Type{<:AbstractBra}, B::Type{<:AbstractKet}) = Number
-_mul_type(A::Type{<:AbstractKet}, B::Type{<:AbstractBra}) = AbstractOperator
-_mul_type(A::Type{<:AbstractKet}, B::Type{<:AbstractBra}) = AbstractOperator
-
-
 
 """
     reduced(a, indices)
