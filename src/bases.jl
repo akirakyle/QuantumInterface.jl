@@ -1,3 +1,6 @@
+abstract type Space end
+abstract type HilbertSpace <: Space end
+
 """
 Abstract type for all specialized bases of a Hilbert space.
 
@@ -14,80 +17,81 @@ All relevant properties of concrete subtypes of `Basis` defined in
 should not assume anything about the internal representation of instances of
 these types (i.e. do not access the fields of the structs directly).
 """
-abstract type Basis <: Space end
-
-abstract type StateBasis <: Basis end
-abstract type OperatorBasis <: Basis end
-
-# TODO: try doing the space thing here that I was trying in quantumsymbolics
-# basically instead of calling basis{,_l,_r} on subtypes of Abstract{Ket,Bra,Operator}
-# just have a space function returns a KetSpace, BraSpace, OperatorSpace, maybe also
-# with a type saying what the explicit representation in that space is (like sparse vs dense)
-# taking inspiration from the parent function of AbstractAlgebra
-# also take instpiration by giving constructors like KetSpace(...)
+abstract type Basis <: HilbertSpace end
+#abstract type StateBasis <: Basis end
+#abstract type OperatorBasis <: Basis end
 
 """
-    length(b::Basis)
+    space(a)
+
+Return the space of a quantum object.
+"""
+function space end
+
+
+"""
+    length(b::Space)
 
 Return the number of subsystems of a quantum object in its tensor product
 decomposition.
 
-See also [`CompositeBasis`](@ref).
+See also [`TensorSpace`](@ref).
 """
-Base.length(b::Basis) = 1
+Base.length(b::Space) = throw(ArgumentError("length() is not defined for $(typeof(b))"))
 
 """
-    getindex(b::Basis)
+    getindex(b::Space)
 
 Get the i'th factor in the tensor product decomposition of the basis into
 subsystems.
 
-See also [`CompositeBasis`](@ref).
+See also [`TensorSpace`](@ref).
 """
-Base.getindex(b::Basis, i) = i==1 ? b : throw(BoundsError(b,i))
-Base.firstindex(b::Basis) = 1
-Base.lastindex(b::Basis) = length(b)
-
-Base.iterate(b::Basis, state=1) = state > length(b) ? nothing : (b[state], state+1)
+Base.getindex(b::Space, i) = throw(ArgumentError("getindex() is not defined for $(typeof(b))"))
+Base.firstindex(b::Space) = 1
+Base.lastindex(b::Space) = length(b)
+Base.iterate(b::Space, state=1) = state > length(b) ? nothing : (b[state], state+1)
 
 """
-    dimension(b::Basis)
+    dimension(b::Space)
 
 Total dimension of the Hilbert space.
 """
-dimension(b::Basis) = throw(ArgumentError("dimesion() is not defined for $(typeof(b))"))
+dimension(b::Space) = throw(ArgumentError("dimension() is not defined for $(typeof(b))"))
 
 """
-    shape(b::Basis)
+    shape(b::Space)
 
 A vector containing the local dimensions of each Hilbert space in its tensor
 product decomposition into subsystems.
 
 See also [`CompositeBasis`](@ref).
 """
-shape(b::Basis) = [dimension(b[i]) for i=1:length(b)]
+shape(b::Space) = [dimension(b[i]) for i=1:length(b)]
 
 ##
-# GenericBasis, CompositeBasis, SumBasis
+# OneModeHilbertSpaces
 ##
 
-struct TrivialBasis() <: Basis
+struct FiniteSpace <: HilbertSpace
+    N::Int
 end
+Base.:(==)(s1::FiniteSpace, s2::FiniteSpace) = s1.N == s2.N
+dimension(s::FiniteSpace) = s.N
 
-"""
-    GenericBasis(N)
+struct InfiniteSpace <: HilbertSpace end
+dimension(b::CompositeBasis) = Inf
 
-A general purpose basis of dimension N.
+struct ArbitrarySpace <: HilbertSpace end
+dimension(b::CompositeBasis) = NaN
 
-Should only be used rarely since it defeats the purpose of checking that the
-bases of state vectors and operators are correct for algebraic operations.
-The preferred way is to specify special bases for different systems.
-"""
-struct GenericBasis{S} <: Basis
-    dim::S
-end
-Base.:(==)(b1::GenericBasis, b2::GenericBasis) = b1.dim == b2.dim
-dimension(b::GenericBasis) = b.dim
+const OneModeHilbertSpace = Union{FiniteSpace, InfiniteSpace, ArbitrarySpace}
+Base.length(b::OneModeHilbertSpace) = 1
+Base.getindex(b::OneModeHilbertSpace, i) = i==1 ? b : throw(BoundsError(b,i))
+
+##
+# TensorSpace, SumSpace
+##
 
 """
     CompositeBasis(b1, b2...)
@@ -98,97 +102,94 @@ Stores the subbases in a vector and creates the shape vector directly from the
 dimensions of these subbases. Instead of creating a CompositeBasis directly,
 `tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` should be used.
 """
-struct CompositeBasis{B<:Basis} <: StateBasis
-    bases::Vector{B}
+struct TensorSpace <: HilbertSpace
+    spaces::Vector{Space}
     shape::Vector{Int}
     lengths::Vector{Int}
     N::Int
     D::Int
-    function CompositeBasis(bases::Vector{B}) where B<:Basis
-        # to enable this check the the lazy operators in QuantumOpticsBase need to be changed
-        #length(bases) > 1 || throw(ArgumentError("CompositeBasis must only be used for composite systems"))
+    function TensorSpace(spaces::Vector{S}) where S<:Space
         shape_ = mapreduce(shape, vcat, bases)
         lengths = cumsum(map(length, bases))
         new{B}(bases, shape_, lengths, lengths[end], prod(shape_))
     end
 end
-CompositeBasis(bases::Basis...) = CompositeBasis([bases...])
-CompositeBasis(bases::Tuple) = CompositeBasis([bases...])
+TensorSpace(bases::Basis...) = TensorSpace([bases...])
+TensorSpace(bases::Tuple) = TensorSpace([bases...])
 
-Base.:(==)(b1::CompositeBasis, b2::CompositeBasis) = all(((i, j),) -> i == j, zip(b1.bases, b2.bases))
-Base.length(b::CompositeBasis) = b.N
-# should probably factor this out and think about "proper" compression...
-# also add a labeled basis as a "layer" on top in linear indices...
-function Base.getindex(b::CompositeBasis, i::Integer)
+Base.:(==)(s1::TensorSpace, s2::TensorSpace) = all(((i, j),) -> i == j, zip(s1.spaces, s2.spaces))
+Base.length(s::TensorSpace) = s.N
+
+function Base.getindex(b::TensorSpace, i::Integer)
     (i < 1 || i > b.N) && throw(BoundsError(b,i))
-    bases_idx = findfirst(l -> i<=l, b.lengths) 
-    inner_idx = i - (bases_idx == 1 ? 0 : b.lengths[bases_idx-1])
-    b.bases[bases_idx][inner_idx]
+    spaces_idx = findfirst(l -> i<=l, b.lengths) 
+    inner_idx = i - (spaces_idx == 1 ? 0 : b.lengths[spaces_idx-1])
+    b.spaces[spaces_idx][inner_idx]
 end
-Base.getindex(b::CompositeBasis, indices) = [b[i] for i in indices]
-shape(b::CompositeBasis) = b.shape
-dimension(b::CompositeBasis) = b.D
+Base.getindex(s::TensorSpace, indices) = [s[i] for i in indices]
+shape(s::TensorSpace) = s.shape
+dimension(s::TensorSpace) = s.D
 
 """
-    tensor(x::Basis, y::Basis, z::Basis...)
+    tensor(x::Space, y::Space, z::Space...)
 
-Create a [`CompositeBasis`](@ref) from the given bases.
+Create a [`TensorSpace`](@ref) from the given bases.
 
-Any given CompositeBasis is expanded so that the resulting CompositeBasis never
-contains another CompositeBasis.
+Any given TensorSpace is expanded so that the resulting TensorSpace does not
+contains another TensorSpace.
 """
-tensor(b1::Basis, b2::Basis) = CompositeBasis([b1, b2])
-tensor(bases::Basis...) = reduce(tensor, bases)
-tensor(basis::Basis) = basis
+tensor(spaces::Space...) = reduce(tensor, spaces)
+tensor(s::Space) = s
 
-function tensor(b1::CompositeBasis, b2::CompositeBasis)
-    if typeof(b1.bases[end]) == typeof(b2.bases[1])
-        t = tensor(b1.bases[end], b2.bases[1])
-        if !(t isa CompositeBasis)
-            return CompositeBasis([b1.bases[1:end-1]; t;  b2.bases[2:end]])
+tensor(s1::HilbertSpace, s2::HilbertSpace) = TensorSpace([s1, s2])
+
+function tensor(b1::TensorBasis, b2::TensorBasis)
+    if typeof(b1.spaces[end]) == typeof(b2.spaces[1])
+        t = tensor(b1.spaces[end], b2.spaces[1])
+        if !(t isa TensorBasis)
+            return TensorBasis([b1.spaces[1:end-1]; t;  b2.spaces[2:end]])
         end
     end
-    return CompositeBasis([b1.bases; b2.bases])
+    return TensorBasis([b1.spaces; b2.spaces])
 end
 
-function tensor(b1::CompositeBasis, b2::Basis)
-    if b1.bases[end] isa typeof(b2)
-        t = tensor(b1.bases[end], b2)
-        if !(t isa CompositeBasis)
-            return CompositeBasis([b1.bases[1:end-1]; t])
+function tensor(b1::TensorBasis, b2::Basis)
+    if b1.spaces[end] isa typeof(b2)
+        t = tensor(b1.spaces[end], b2)
+        if !(t isa TensorBasis)
+            return TensorBasis([b1.spaces[1:end-1]; t])
         end
     end
-    return CompositeBasis([b1.bases; b2])
+    return TensorBasis([b1.spaces; b2])
 end
 
-function tensor(b1::Basis, b2::CompositeBasis)
-    if b2.bases[1] isa typeof(b1)
-        t = tensor(b1, b2.bases[1])
-        if !(t isa CompositeBasis)
-            return CompositeBasis([t; b2[2:end]])
+function tensor(b1::Basis, b2::TensorBasis)
+    if b2.spaces[1] isa typeof(b1)
+        t = tensor(b1, b2.spaces[1])
+        if !(t isa TensorBasis)
+            return TensorBasis([t; b2[2:end]])
         end
     end
-    return CompositeBasis([b1; b2.bases])
+    return TensorBasis([b1; b2.spaces])
 end
 
-Base.:^(b::Basis, N::Integer) = tensor_pow(b, N)
+Base.:^(b::Space, N::Integer) = tensor_pow(b, N)
 
 """
-    SumBasis(b1, b2...)
+    SumSpace(b1, b2...)
 
-Similar to [`CompositeBasis`](@ref) but for the [`directsum`](@ref) (⊕)
+Similar to [`TensorSpace`](@ref) but for the [`directsum`](@ref) (⊕)
 """
-struct SumBasis{S<:Integer,B<:Basis} <: StateBasis
+struct SumSpace <: HilbertSpace
     shape::Vector{S}
-    bases::Vector{B}
+    spaces::Vector{B}
 end
-SumBasis(bases) = SumBasis([dimension(b) for b in bases], bases)
-SumBasis(bases::Basis...) = SumBasis([bases...])
-SumBasis(bases::Tuple) = SumBasis([bases...])
+SumSpace(spaces) = SumSpace([dimension(b) for b in spaces], spaces)
+SumSpace(spaces::Space...) = SumSpace([spaces...])
+SumSpace(spaces::Tuple) = SumSpace([spaces...])
 
-Base.:(==)(b1::SumBasis, b2::SumBasis) = all(((i, j),) -> i == j, zip(b1.bases, b2.bases))
-dimension(b::SumBasis) = sum(b.shape)
-
+Base.:(==)(s1::SumSpace, s2::SumSpace) = all(((i, j),) -> i == j, zip(s1.spaces, s2.spaces))
+dimension(s::SumSpace) = sum(dimension.(s.spaces))
 
 
 """
@@ -197,29 +198,63 @@ dimension(b::SumBasis) = sum(b.shape)
 Return the number of subspaces of a [`SumBasis`](@ref) in its direct sum
 decomposition.
 """
-nsubspaces(b::SumBasis) = length(b.bases)
+nsubspaces(b::SumSpace) = length(b.spaces)
 
 """
     subspace(b, i)
 
-Return the basis for the `i`th subspace of of a [`SumBasis`](@ref).
+Return the basis for the `i`th subspace of of a [`SumSpace`](@ref).
 """
-subspace(b::SumBasis, i) = b.bases[i]
+subspace(b::SumSpace, i) = b.spaces[i]
 
 """
-    directsum(b1::Basis, b2::Basis)
+    directsum(b1::HilbertSpace, b2::HilbertSpace)
 
-Construct the [`SumBasis`](@ref) out of two sub-bases.
+Construct the [`SumSpace`](@ref) out of two sub-bases.
 """
-directsum(b1::Basis, b2::Basis) = SumBasis([dimension(b1), dimension(b2)], [b1, b2])
-directsum(b1::SumBasis, b2::SumBasis) = SumBasis([b1.shape, b2.shape], [b1.bases; b2.bases])
-directsum(b1::SumBasis, b2::Basis) = SumBasis([b1.shape; dimension(b2)], [b1.bases; b2])
-directsum(b1::Basis, b2::SumBasis) = SumBasis([dimension(b1); b2.shape], [b1; b2.bases])
-directsum(bases::Basis...) = reduce(directsum, bases)
-directsum(basis::Basis) = basis
+directsum(b1::HilbertSpace, b2::HilbertSpace) = SumSpace([dimension(b1), dimension(b2)], [b1, b2])
+directsum(b1::SumSpace, b2::SumSpace) = SumSpace([b1.shape, b2.shape], [b1.bases; b2.bases])
+directsum(b1::SumSpace, b2::HilbertSpace) = SumSpace([b1.shape; dimension(b2)], [b1.bases; b2])
+directsum(b1::HilbertSpace, b2::SumSpace) = SumSpace([dimension(b1); b2.shape], [b1; b2.bases])
+directsum(bases::HilbertSpace...) = reduce(directsum, bases)
+directsum(basis::HilbertSpace) = basis
 
 # TODO: what to do about embed for SumBasis?
 #embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
+
+##
+# Quantum object spaces
+##
+
+struct CNumSpace <: Space end
+
+struct VecSpace{T} <: Space
+    s::Space
+end
+Base.:(==)(s1::VecSpace, s2::VecSpace) = s1.s == s2.s
+dimension(s::VecSpace) = dimension(s.s)
+const KetSpace = VecSpace{AbstractKet}
+const BraSpace = VecSpace{AbstractBra}
+
+struct OpSpace{T} <: Space
+    sl::Space
+    sr::Space
+end
+OpSpace{T}(b) = OpSpace{T}(b,b)
+Base.:(==)(s1::OpSpace, s2::OpSpace) = s1.sl == s2.sl && s1.sr == s2.sr
+dimension(s::OpSpace) = dimension(s.sl)*dimension(s.sr)
+space_l(s::OpSpace) = s.sl
+space_l(s::OpSpace) = s.sr
+
+const OperatorSpace = OpSpace{AbstractOperator}
+const SuperKetSpace = OpSpace{AbstractSuperKet}
+const SuperBraSpace = OpSpace{AbstractSuperBra}
+const SuperOperatorSpace = OpSpace{AbstractSuperOperator}
+const ChoiStateSpace = OpSpace{AbstractChoiState}
+const KrausSpace = OpSpace{AbstractKraus}
+const StinespringSpace = OpSpace{AbstractStinespring}
+
+const QOSpace = Union{CNumSpace, VecSpace, OpSpace}
 
 ##
 # Basis checks
@@ -228,68 +263,63 @@ directsum(basis::Basis) = basis
 """
 Exception that should be raised for an illegal algebraic operation.
 """
-mutable struct IncompatibleBases <: Exception end
+mutable struct IncompatibleSpaces <: Exception end
 
-const BASES_CHECK = Ref(true)
+const SPACES_CHECK = Ref(true)
 
 """
-    @compatiblebases
+    @compatiblespaces
 
-Macro to skip checks for compatible bases. Useful for `*`, `expect` and similar
+Macro to skip checks for compatible spaces. Useful for `*`, `expect` and similar
 functions.
 """
-macro compatiblebases(ex)
+macro compatiblespaces(ex)
     return quote
-        BASES_CHECK[] = false
+        SPACES_CHECK[] = false
         local val = $(esc(ex))
-        BASES_CHECK[] = true
+        SPACES_CHECK[] = true
         val
     end
 end
 
 """
-    samebases(b1::Basis, b2::Basis)
+    samespaces(a::Space, a::Space)
 
-Test if two bases are the same. Equivalant to `==`. See
-[`check_samebases`](@ref).
+Test if two spaces are the same. Equivalant to `==`. See
+[`check_samespaces`](@ref).
 """
-samebases(b1::Basis, b2::Basis) = b1==b2
+samespaces(a::Space, b::Space) = a==b
 
 """
-    check_samebases(a, b)
+    check_samespaces(a, b)
 
-Throw an [`IncompatibleBases`](@ref) error if the bases are not the same. See
-[`samebases`](@ref).
+Throw an [`IncompatibleSpaces`](@ref) error if the spaces are not the same. See
+[`samespaces`](@ref).
 """
-function check_samebases(b1, b2)
-    if BASES_CHECK[] && !samebases(b1, b2)
-        throw(IncompatibleBases())
+function check_samespaces(a, b)
+    if SPACES_CHECK[] && !samespaces(a, b)
+        throw(IncompatibleSpaces())
     end
 end
 
 """
     addible(a, b)
 
-Check if any two subtypes of `StateVector` or `AbstractOperator`
- can be added together.
-
-Spcefically this checks whether the left basis of a is equal
-to the left basis of b and whether the right basis of a is equal
-to the right basis of b.
+Check if two quantum objects can be added together.
 """
-addible(a::Space, b::Space) = a == b
-add_space(a::Space, b::Space) = a
+addible(a::QOSpace, b::QOSpace) = a == b
+add_space(a::QOSpace, b::QOSpace) = a
 
 """
     check_addible(a, b)
 
-Throw an [`IncompatibleBases`](@ref) error if the objects are not addible as
-determined by `addible(a, b)`.  Disabled by use of [`@compatiblebases`](@ref)
+Throw an [`IncompatibleSpaces`](@ref) error if the objects are not addible as
+determined by `addible(a, b)`.  Disabled by use of [`@compatiblespaces`](@ref)
 anywhere further up in the call stack.
 """
 function check_addible(a, b)
-    if BASES_CHECK[] && !addible(a, b)
-        throw(IncompatibleBases())
+    if SPACES_CHECK[] && !addible(a, b)
+        throw(IncompatibleSpaces())
     end
     add_space(a, b)
 end
@@ -297,20 +327,36 @@ end
 """
     multiplicable(a, b)
 
-Check if any two subtypes of `StateVector` or `AbstractOperator`,
-can be multiplied in the given order.
+Check if any two quantum objects can be multiplied in the given order.
 """
-multiplicable(a::Space, b::Space) = false
+multiplicable(a::QOSpace, b::QOSpace) = false
+
 multiplicable(a::KetSpace, b::BraSpace) = true
+mul_space(a::KetSpace, b::BraSpace) = OperatorSpace(a.s, b.s)
+
 multiplicable(a::BraSpace, b::KetSpace) = a.b == b.b
-multiplicable(a::OperatorSpace, b::KetSpace) = a.right == b.b
-multiplicable(a::BraSpace, b::OperatorSpace) = a.b == b.left
-multiplicable(a::OperatorSpace, b::OperatorSpace) = a.right == b.left
-mul_space(a::KetSpace, b::BraSpace) = OperatorSpace(a.b, b.b)
-mul_space(a::BraSpace, b::KetSpace) = KetSpace(TrivialBasis())
-mul_space(a::OperatorSpace, b::KetSpace) = KetSpace(a.left)
-mul_space(a::BraSpace, b::OperatorSpace) = BraSpace(b.right)
-mul_space(a::OperatorSpace, b::OperatorSpace) = Space(a.left, b.right)
+mul_space(a::BraSpace, b::KetSpace) = CNumSpace()
+
+multiplicable(a::OperatorSpace, b::KetSpace) = a.sr == b.b
+mul_space(a::OperatorSpace, b::KetSpace) = KetSpace(a.sl)
+
+multiplicable(a::BraSpace, b::OperatorSpace) = a.b == b.sl
+mul_space(a::BraSpace, b::OperatorSpace) = BraSpace(b.sr)
+
+multiplicable(a::OperatorSpace, b::OperatorSpace) = a.sr == b.sl
+mul_space(a::OperatorSpace, b::OperatorSpace) = OpSpace(a.sl, b.sr)
+
+#multiplicable(a::SuperKetSpace, b::SuperBraSpace) = true
+#multiplicable(a::SuperBraSpace, b::SuperKetSpace) = a.b == b.b
+
+multiplicable(a::SuperOperatorSpace, b::SuperKetSpace) = a.sr.sr == b.sr && a.sr.sl = b.sl
+mul_space(a::SuperOperatorSpace, b::SuperKetSpace) = SuperKetSpace(a.sl.sl, a.sr.sr)
+
+multiplicable(a::SuperBraSpace, b::SuperOperatorSpace) = a.b == b.sl
+mul_space(a::SuperBraSpace, b::SuperOperatorSpace) = BraSpace(b.sr)
+
+multiplicable(a::SuperOperatorSpace, b::SuperOperatorSpace) = a.sr == b.sl
+mul_space(a::SuperOperatorSpace, b::SuperOperatorSpace) = OpSpace(a.sl, b.sr)
 
 """
     check_multiplicable(a, b)
@@ -381,6 +427,13 @@ end
 ##
 # Common bases
 ##
+
+struct LabeledBasis <: OneModeBasis
+    space::OneModeHilbertSpace
+    label::Symbol
+end
+Base.:(==)(b1::LabeledBasis, b2::LabeledBasis) = b1.space == b2.space && b1.label == b2.label
+dimension(b::FiniteSpace) = b.D
 
 """
     FockBasis(N,offset=0)
