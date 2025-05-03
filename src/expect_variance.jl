@@ -33,5 +33,5 @@ function variance(op::AbstractOperator, state::AbstractOperator)
     check_multiplicable(op,op)
     check_multiplicable(state,state)
     check_multiplicable(op,state)
-    @compatiblebases expect(op*op, state) - expect(op, state)^2
+    @compatiblespaces expect(op*op, state) - expect(op, state)^2
 end

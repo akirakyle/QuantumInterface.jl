@@ -11,9 +11,6 @@ function equal_bases(a, b)
     return true
 end
 
-# TODO: figure out how to deprecate abstract type
-abstract type AbstractSuperOperator end
-
 function basis(a::AbstractSuperOperator)
     Base.depwarn("`AbstractSuperOperator` will be removed in a future version", :equal_shape)
     (check_samebases(a); a.basis_l[1]) # FIXME issue #12
@@ -76,15 +73,15 @@ function multiplicable(b1::Basis, b2::Basis)
     b1==b2
 end
 
-function multiplicable(b1::CompositeBasis, b2::CompositeBasis)
-    Base.depwarn("`==` between bases should be used instead of `multiplicable`.", :check_samebases)
-    if !equal_shape(b1.shape,b2.shape)
-        return false
-    end
-    for i=1:length(b1.shape)
-        if !multiplicable(b1.bases[i], b2.bases[i])
-            return false
-        end
-    end
-    return true
-end
+#function multiplicable(b1::CompositeBasis, b2::CompositeBasis)
+#    Base.depwarn("`==` between bases should be used instead of `multiplicable`.", :check_samebases)
+#    if !equal_shape(b1.shape,b2.shape)
+#        return false
+#    end
+#    for i=1:length(b1.shape)
+#        if !multiplicable(b1.bases[i], b2.bases[i])
+#            return false
+#        end
+#    end
+#    return true
+#end

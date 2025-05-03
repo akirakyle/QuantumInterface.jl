@@ -1,6 +1,6 @@
 using Test
 using QuantumInterface: dimension, shape, tensor, ⊗, ptrace, reduced, permutesystems, multiplicable
-using QuantumInterface: GenericBasis, CompositeBasis, NLevelBasis, FockBasis
+using QuantumInterface: FiniteSpace, TensorSpace, NLevelBasis, FockBasis
 
 @testset "basis" begin
 
@@ -8,9 +8,9 @@ d1 = 5
 d2 = 2
 d3 = 6
 
-b1 = GenericBasis(d1)
-b2 = GenericBasis(d2)
-b3 = GenericBasis(d3)
+b1 = FiniteSpace(d1)
+b2 = FiniteSpace(d2)
+b3 = FiniteSpace(d3)
 
 @test dimension(b1) == d1
 @test dimension(b2) == d2
@@ -26,13 +26,13 @@ comp_b2 = tensor(b1, b1, b2)
 @test shape(comp_uni) == [d1, d2]
 @test shape(comp_b2) == [d1, d1, d2]
 
-@test b1^3 == CompositeBasis(b1, b1, b1)
-@test (b1⊗b2)^2 == CompositeBasis(b1, b2, b1, b2)
+@test b1^3 == TensorSpace(b1, b1, b1)
+@test (b1⊗b2)^2 == TensorSpace(b1, b2, b1, b2)
 @test_throws DomainError b1^(0)
 
 comp_b1_b2 = tensor(comp_b1, comp_b2)
 @test shape(comp_b1_b2) == [d1, d2, d1, d1, d2]
-@test comp_b1_b2 == CompositeBasis(b1, b2, b1, b1, b2)
+@test comp_b1_b2 == TensorSpace(b1, b2, b1, b1, b2)
 
 @test_throws ArgumentError tensor()
 @test shape(comp_b2) == shape(tensor(b1, comp_b1))

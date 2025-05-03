@@ -59,6 +59,27 @@ abstract type AbstractChoiState <: AbstractChannel end
 abstract type AbstractKraus <: AbstractChannel end
 abstract type AbstractStinespring <: AbstractChannel end
 
+abstract type Space end
+
+"""
+Abstract type for all specialized bases of a Hilbert space.
+
+This type specifies an orthonormal basis for the Hilbert space of the given
+system. All subtypes must implement `Base.:(==)` and `dimension`, where the
+latter should return the total dimension of the Hilbert space.
+
+Composite systems can be defined with help of [`CompositeBasis`](@ref).
+Custom subtypes can also define composite systems by implementing
+`Base.length` and `Base.getindex`.
+
+All relevant properties of concrete subtypes of `Basis` defined in
+`QuantumInterface` should be accessed using their documented functions and
+should not assume anything about the internal representation of instances of
+these types (i.e. do not access the fields of the structs directly).
+"""
+abstract type Basis <: Space end
+abstract type OperatorBasis <: Space end
+
 function summary(stream::IO, x::AbstractOperator)
     print(stream, "$(typeof(x).name.name)(dim=$(dimension(x.basis_l))x$(dimension(x.basis_r)))\n")
     if multiplicable(x,x)
