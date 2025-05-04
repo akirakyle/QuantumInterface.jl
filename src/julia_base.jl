@@ -16,8 +16,6 @@ addnumbererror() = throw(ArgumentError("Can't add or subtract a number and an op
 copy(a::T) where {T<:StateVector} = T(basis(a), copy(a.data)) # FIXME issue #12
 length(a::StateVector) = dimension(space(a))
 space(a::StateVector) = throw(ArgumentError("space() is not defined for this type of state vector: $(typeof(a))."))
-basis(a::AbstractKet) = space(space(a))
-basis(a::AbstractBra) = space(space(a))
 directsum(x::StateVector...) = reduce(directsum, x)
 
 # Array-like functions
@@ -40,7 +38,6 @@ dagger(a::StateVector) = arithmetic_unary_error("Hermitian conjugate", a)
 
 space(a::AbstractOperator) = throw(ArgumentError("space() is not defined for this type of operator: $(typeof(a))."))
 length(a::AbstractOperator) = dimension(space(a))
-basis(a::AbstractOperator) = (check_samebases(space_l(space(a)), space_r(space(a))); space_l(space(a)))
 directsum(a::AbstractOperator...) = reduce(directsum, a)
 
 # Ensure scalar broadcasting

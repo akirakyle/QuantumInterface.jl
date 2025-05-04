@@ -59,8 +59,6 @@ abstract type AbstractChoiState <: AbstractChannel end
 abstract type AbstractKraus <: AbstractChannel end
 abstract type AbstractStinespring <: AbstractChannel end
 
-const QObject = Union{StateVector, OperatorVector, AbstractOperator, AbstractChannel}
-
 abstract type Space end
 
 """

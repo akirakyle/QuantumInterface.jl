@@ -5,8 +5,6 @@ Return the space of a quantum object.
 """
 function space end
 
-function basis end
-
 """
     length(b::Space)
 
@@ -139,32 +137,6 @@ tensor(s1::Space, s2::TensorSpace) = TensorSpace([s1; s2.spaces])
 Base.:^(b::Space, N::Integer) = tensor_pow(b, N)
 
 """
-    CompositeBasis(b1, b2...)
-
-Basis for composite Hilbert spaces.
-
-Stores the subbases in a vector and creates the shape vector directly from the
-dimensions of these subbases. Instead of creating a CompositeBasis directly,
-`tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` should be used.
-"""
-
-"""
-struct CompositeBasis <: Basis
-    s::TensorSpace
-end
-Base.:(==)(s1::CompositeBasis, s2::CompositeBasis) = s1.s == s2.s
-Base.length(s::CompositeBasis) = length(s.s)
-Base.getindex(s::CompositeBasis, i) = s.s[i]
-shape(s::CompositeBasis) = shape(s.s)
-dimension(s::CompositeBasis) = dimension(s.s)
-tensor(s1::CompositeBasis, s2::CompositeBasis) = CompositeBasis(tensor(s1.s, s2.s))
-tensor(s1::CompositeBasis, s2::Space) = CompositeBasis(tensor(s1.s, s2))
-tensor(s1::Space, s2::CompositeBasis) = CompositeBasis(tensor(s1, s2.s))
-tensor(s1::Basis, s2::Basis) = CompositeBasis(TensorSpace([s1, s2]))
-"""
-
-
-"""
     SumSpace(b1, b2...)
 
 Similar to [`TensorSpace`](@ref) but for the [`directsum`](@ref) (⊕)
@@ -200,33 +172,11 @@ subspace(b::SumSpace, i) = b.spaces[i]
 Construct the [`SumSpace`](@ref) out of two sub-bases.
 """
 directsum(b1::Space, b2::Space) = SumSpace([b1, b2])
-directsum(b1::SumSpace, b2::SumSpace) = SumSpace([b1.bases; b2.bases])
-directsum(b1::SumSpace, b2::Space) = SumSpace([b1.bases; b2])
-directsum(b1::Space, b2::SumSpace) = SumSpace([b1; b2.bases])
-directsum(bases::Space...) = reduce(directsum, bases)
+directsum(b1::SumSpace, b2::SumSpace) = SumSpace([b1.spaces; b2.spaces])
+directsum(b1::SumSpace, b2::Space) = SumSpace([b1.spaces; b2])
+directsum(b1::Space, b2::SumSpace) = SumSpace([b1; b2.spaces])
+directsum(spaces::Space...) = reduce(directsum, spaces)
 directsum(basis::Space) = basis
-
-
-"""
-    SumBasis(b1, b2...)
-
-Similar to [`CompositeBasis`](@ref) but for the [`directsum`](@ref) (⊕)
-"""
-
-"""
-struct SumBasis <: Basis
-    s::TensorSpace
-end
-Base.:(==)(s1::SumBasis, s2::SumBasis) = s1.s == s2.s
-Base.length(s::SumBasis) = length(s.s)
-Base.getindex(s::SumBasis, i) = s.s[i]
-shape(s::SumBasis) = shape(s.s)
-dimension(s::SumBasis) = dimension(s.s)
-directsum(s1::SumBasis, s2::SumBasis) = SumBasis(directsum(s1.s, s2.s))
-directsum(s1::SumBasis, s2::Space) = SumBasis(directsum(s1.s, s2))
-directsum(s1::Space, s2::SumBasis) = SumBasis(directsum(s1, s2.s))
-"""
-
 
 # TODO: what to do about embed for SumBasis?
 #embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
@@ -238,121 +188,67 @@ directsum(s1::Space, s2::SumBasis) = SumBasis(directsum(s1, s2.s))
 """
 Exception that should be raised for an illegal algebraic operation.
 """
-mutable struct IncompatibleBases <: Exception end
-
-const BASES_CHECK = Ref(true)
+mutable struct IncompatibleSpaces <: Exception end
 
 """
-    @compatiblebases
+    +(a::Space, b::Space)
 
-Macro to skip checks for compatible bases. Useful for `*`, `expect` and similar
-functions.
+Check if two quantum spaces can be added together and if so return the resulting space
 """
-macro compatiblebases(ex)
-    return quote
-        BASES_CHECK[] = false
-        local val = $(esc(ex))
-        BASES_CHECK[] = true
-        val
-    end
+function +(a::Space, b::Space)
+    a == b || throw(IncompatibleSpaces())
+    return a
 end
 
 """
-    samebases(a::Space, a::Space)
+    *(a::Space, b::Space)
 
-Test if two bases are the same. Equivalant to `==`. See
-[`check_samebases`](@ref).
+Check if two quantum spaces can be multiplied together and if so return the resulting space
 """
-samebases(a::Space, b::Space) = a==b
-
-"""
-    check_samebases(a, b)
-
-Throw an [`IncompatibleBases`](@ref) error if the bases are not the same. See
-[`samebases`](@ref).
-"""
-function check_samebases(a, b)
-    if BASES_CHECK[] && !samebases(a, b)
-        throw(IncompatibleBases())
-    end
+*(::Space, ::Space) = throw(IncompatibleSpaces())
+*(a::CNumberSpace, b::CNumberSpace) = a
+*(a::KetSpace, b::BraSpace) = OpSpace(a.s, b.s)
+function *(a::BraSpace, b::KetSpace)
+    a.s == b.s || throw(IncompatibleSpaces())
+    CNumberSpace()
 end
-
-"""
-    addible(a, b)
-
-Check if two quantum objects can be added together.
-"""
-addible(a::Space, b::Space) = a == b
-add_space(a::Space, b::Space) = a
-
-"""
-    check_addible(a, b)
-
-Throw an [`IncompatibleSpaces`](@ref) error if the objects are not addible as
-determined by `addible(a, b)`.  Disabled by use of [`@compatiblespaces`](@ref)
-anywhere further up in the call stack.
-"""
-function check_addible(a, b)
-    if BASES_CHECK[] && !addible(a, b)
-        throw(IncompatibleBases())
-    end
-    add_space(a, b)
+function *(a::OperatorSpace, b::KetSpace)
+    a.sr == b.s || throw(IncompatibleSpaces())
+    KetSpace(a.sl)
 end
-
-"""
-    multiplicable(a, b)
-
-Check if any two quantum objects can be multiplied in the given order.
-"""
-multiplicable(a::QObject, b::QObject) = multiplicable(space(a), space(b))
-
-multiplicable(a::Space, b::Space) = false
-
-multiplicable(a::CNumberSpace, b::CNumberSpace) = true
-mul_space(a::CNumberSpace, b::CNumberSpace) = a
-
-multiplicable(a::KetSpace, b::BraSpace) = true
-mul_space(a::KetSpace, b::BraSpace) = OpSpace(a.s, b.s)
-
-multiplicable(a::BraSpace, b::KetSpace) = a.s == b.s
-mul_space(a::BraSpace, b::KetSpace) = CNumberSpace()
-
-multiplicable(a::OperatorSpace, b::KetSpace) = a.sr == b.s
-mul_space(a::OperatorSpace, b::KetSpace) = KetSpace(a.sl)
-
-multiplicable(a::BraSpace, b::OperatorSpace) = a.s == b.sl
-mul_space(a::BraSpace, b::OperatorSpace) = BraSpace(b.sr)
-
-multiplicable(a::OperatorSpace, b::OperatorSpace) = a.sr == b.sl
-mul_space(a::OperatorSpace, b::OperatorSpace) = OperatorSpace(a.sl, b.sr)
+function *(a::BraSpace, b::OperatorSpace)
+    a.s == b.sl || throw(IncompatibleSpaces())
+    BraSpace(b.sr)
+end
+function *(a::OperatorSpace, b::OperatorSpace)
+    a.sr == b.sl || throw(IncompatibleSpaces())
+    OperatorSpace(a.sl, b.sr)
+end
 
 #multiplicable(a::SuperKetSpace, b::SuperBraSpace) = true
 #multiplicable(a::SuperBraSpace, b::SuperKetSpace) = a.b == b.b
 
-multiplicable(a::SuperOperatorSpace, b::SuperKetSpace) = a.sr == b.s
-mul_space(a::SuperOperatorSpace, b::SuperKetSpace) = SuperKetSpace(a.sl)
+function *(a::SuperOperatorSpace, b::SuperKetSpace)
+    a.sr == b.s || throw(IncompatibleSpaces())
+    SuperKetSpace(a.sl)
+end
+function *(a::SuperBraSpace, b::SuperOperatorSpace)
+    a.s == b.sl || throw(IncompatibleSpaces())
+    BraSpace(b.sr)
+end
+function *(a::OpSpace{T}, b::OpSpace{T}) where T<:AbstractChannel
+    a.sr == b.sl || throw(IncompatibleSpaces())
+    OpSpace{T}(a.sl, b.sr)
+end
+function *(a::OpSpace{T}, b::OperatorSpace) where T<:AbstractChannel
+    a.sr == b.sl || throw(IncompatibleSpaces())
+    OperatorSpace(a.sl, b.sr)
+end
 
-multiplicable(a::SuperBraSpace, b::SuperOperatorSpace) = a.s == b.sl
-mul_space(a::SuperBraSpace, b::SuperOperatorSpace) = BraSpace(b.sr)
-
-multiplicable(a::SuperOperatorSpace, b::SuperOperatorSpace) = a.sr == b.sl
-mul_space(a::SuperOperatorSpace, b::SuperOperatorSpace) = SuperOperatorSpace(a.sl, b.sr)
-
-multiplicable(a::ChoiStateSpace, b::ChoiStateSpace) = a.sr == b.sl
-mul_space(a::ChoiStateSpace, b::ChoiStateSpace) = ChoiStateSpace(a.sl, b.sr)
-
-"""
-    check_multiplicable(a, b)
-
-Throw an [`IncompatibleBases`](@ref) error if the objects are not multiplicable
-as determined by `multiplicable(a, b)`.  Disabled by use of
-[`@compatiblebases`](@ref) anywhere further up in the call stack.
-"""
-function check_multiplicable(a, b)
-    if BASES_CHECK[] && !multiplicable(a, b)
-        throw(IncompatibleSpaces())
-    end
-    mul_space(a, b)
+tr(::Space) = throw(IncompatibleSpaces())
+function tr(a::OpSpace)
+    a.sl == b.sr || throw(IncompatibleSpaces())
+    CNumberSpace()
 end
 
 """
@@ -389,8 +285,7 @@ function ptrace(b::Space, indices)
     reduced(b, J)
 end
 
-_index_complement(b::Space, indices) = complement(length(b), indices)
-reduced(a, indices) = ptrace(a, _index_complement(basis(a), indices))
+reduced(a, indices) = ptrace(a, complement(length(basis(a)), indices))
 
 """
     permutesystems(a, perm)

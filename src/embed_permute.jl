@@ -5,7 +5,7 @@
 `operators` is a dictionary `Dict{Vector{Int}, AbstractOperator}`. The integer vector
 specifies in which subsystems the corresponding operator is defined.
 """
-function embed(bl::Basis, br::Basis,
+function embed(bl::Space, br::Space,
                operators::Dict{<:Vector{<:Integer}, T}) where T<:AbstractOperator
     (length(bl) == length(br)) || throw(ArgumentError("Must have length(bl) == length(br) in embed"))
     N = length(bl)::Int # type assertion to help type inference
@@ -35,16 +35,16 @@ function embed(bl::Basis, br::Basis,
         return permutesystems(op, perm)
     end
 end
-embed(bl::Basis, br::Basis, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(bl, br, Dict([i]=>op_i for (i, op_i) in operators); kwargs...)
-embed(b::Basis, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(b, b, operators; kwargs...)
-embed(b::Basis, operators::Dict{<:Vector{<:Integer}, T}; kwargs...) where {T<:AbstractOperator} = embed(b, b, operators; kwargs...)
+embed(bl::Space, br::Space, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(bl, br, Dict([i]=>op_i for (i, op_i) in operators); kwargs...)
+embed(b::Space, operators::Dict{<:Integer, T}; kwargs...) where {T<:AbstractOperator} = embed(b, b, operators; kwargs...)
+embed(b::Space, operators::Dict{<:Vector{<:Integer}, T}; kwargs...) where {T<:AbstractOperator} = embed(b, b, operators; kwargs...)
 
 # The dictionary implementation works for non-DataOperators
-embed(bl::Basis, br::Basis, indices, op::T) where T<:AbstractOperator = embed(bl, br, Dict(indices=>op))
+embed(bl::Space, br::Space, indices, op::T) where T<:AbstractOperator = embed(bl, br, Dict(indices=>op))
 
-embed(bl::Basis, br::Basis, index::Integer, op::AbstractOperator) = embed(bl, br, index, [op])
-embed(b::Basis, indices, operators::Vector{T}) where {T<:AbstractOperator} = embed(b, b, indices, operators)
-embed(b::Basis, indices, op::AbstractOperator) = embed(b, b, indices, op)
+embed(bl::Space, br::Space, index::Integer, op::AbstractOperator) = embed(bl, br, index, [op])
+embed(b::Space, indices, operators::Vector{T}) where {T<:AbstractOperator} = embed(b, b, indices, operators)
+embed(b::Space, indices, op::AbstractOperator) = embed(b, b, indices, op)
 
 
 """
@@ -52,7 +52,7 @@ embed(b::Basis, indices, op::AbstractOperator) = embed(b, b, indices, op)
 
 Tensor product of operators where missing indices are filled up with identity operators.
 """
-function embed(bl::Basis, br::Basis,
+function embed(bl::Space, br::Space,
                indices, operators::Vector{T}) where T<:AbstractOperator
 
     check_embed_indices(indices) || throw(ArgumentError("Must have unique indices in embed"))
@@ -67,8 +67,8 @@ function embed(bl::Basis, br::Basis,
     ops_sb = [x[2] for x in idxop_sb]
 
     for (idxsb, opsb) in zip(indices_sb, ops_sb)
-        (space(opsb).bl == bl[idxsb]) || throw(IncompatibleBases())
-        (space(opsb).bl == br[idxsb]) || throw(IncompatibleBases())
+        (space(opsb).bl == bl[idxsb]) || throw(IncompatibleSpaces())
+        (space(opsb).bl == br[idxsb]) || throw(IncompatibleSpaces())
     end
 
     S = length(operators) > 0 ? mapreduce(eltype, promote_type, operators) : Any

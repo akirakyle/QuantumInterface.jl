@@ -1,5 +1,5 @@
 using Test
-using QuantumInterface: dimension, shape, tensor, ⊗, ptrace, reduced, permutesystems, multiplicable
+using QuantumInterface: dimension, shape, tensor, ⊗, ptrace, reduced, permutesystems
 using QuantumInterface: FiniteSpace, TensorSpace, NLevelBasis, FockBasis
 
 @testset "basis" begin
