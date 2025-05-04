@@ -16,8 +16,8 @@ addnumbererror() = throw(ArgumentError("Can't add or subtract a number and an op
 copy(a::T) where {T<:StateVector} = T(basis(a), copy(a.data)) # FIXME issue #12
 length(a::StateVector) = dimension(space(a))
 space(a::StateVector) = throw(ArgumentError("space() is not defined for this type of state vector: $(typeof(a))."))
-basis(a::AbstractKet) = space(a).b # TODO check if right is TrivialBasis?
-basis(a::AbstractBra) = space(a).b # TODO check if right is TrivialBasis?
+basis(a::AbstractKet) = space(space(a))
+basis(a::AbstractBra) = space(space(a))
 directsum(x::StateVector...) = reduce(directsum, x)
 
 # Array-like functions
@@ -40,7 +40,7 @@ dagger(a::StateVector) = arithmetic_unary_error("Hermitian conjugate", a)
 
 space(a::AbstractOperator) = throw(ArgumentError("space() is not defined for this type of operator: $(typeof(a))."))
 length(a::AbstractOperator) = dimension(space(a))
-basis(a::AbstractOperator) = (check_samebases(space(a).bl, space(a).br); space(a).bl)
+basis(a::AbstractOperator) = (check_samebases(space_l(space(a)), space_r(space(a))); space_l(space(a)))
 directsum(a::AbstractOperator...) = reduce(directsum, a)
 
 # Ensure scalar broadcasting
@@ -67,11 +67,11 @@ Operator exponential.
 """
 exp(op::AbstractOperator) = throw(ArgumentError("exp() is not defined for this type of operator: $(typeof(op)).\nTry to convert to dense operator first with dense()."))
 
-Base.size(op::AbstractOperator) = (dimension(basis_l(op)),dimension(basis_r(op)))
+Base.size(op::AbstractOperator) = (dimension(space_l(op)), dimension(space_r(op)))
 function Base.size(op::AbstractOperator, i::Int)
     i < 1 && throw(ErrorException("dimension index is < 1"))
     i > 2 && return 1
-    i==1 ? dimension(space(op).bl) : dimension(space(op).br)
+    i==1 ? dimension(space_l(space(op))) : dimension(space_r(space(op)))
 end
 
 Base.adjoint(a::AbstractOperator) = dagger(a)

@@ -5,6 +5,8 @@ Return the space of a quantum object.
 """
 function space end
 
+function basis end
+
 """
     length(b::Space)
 
@@ -73,10 +75,11 @@ struct VecSpace{T} <: Space
 end
 Base.:(==)(s1::VecSpace, s2::VecSpace) = s1.s == s2.s
 dimension(s::VecSpace) = dimension(s.s)
-const KetSpace = VecSpace{AbstractKet}
-const BraSpace = VecSpace{AbstractBra}
-const SuperKetSpace = VecSpace{AbstractSuperKet}
-const SuperBraSpace = VecSpace{AbstractSuperBra}
+space(s::VecSpace) = s.s
+const KetSpace = VecSpace{<:AbstractKet}
+const BraSpace = VecSpace{<:AbstractBra}
+const SuperKetSpace = VecSpace{<:AbstractSuperKet}
+const SuperBraSpace = VecSpace{<:AbstractSuperBra}
 SuperKetSpace(bl,br) = SuperKetSpace(OpSpace(bl,br))
 SuperBraSpace(bl,br) = SuperBraSpace(OpSpace(bl,br))
 tensor(s1::VecSpace{T}, s2::VecSpace{T}) where {T} = VecSpace{T}(tensor(s1.s, s2.s))
@@ -91,11 +94,11 @@ dimension(s::OpSpace) = dimension(s.sl)*dimension(s.sr)
 space_l(s::OpSpace) = s.sl
 space_r(s::OpSpace) = s.sr
 
-const OperatorSpace = OpSpace{AbstractOperator}
-const SuperOperatorSpace = OpSpace{AbstractSuperOperator}
-const ChoiStateSpace = OpSpace{AbstractChoiState}
-const KrausSpace = OpSpace{AbstractKraus}
-const StinespringSpace = OpSpace{AbstractStinespring}
+const OperatorSpace = OpSpace{<:AbstractOperator}
+const SuperOperatorSpace = OpSpace{<:AbstractSuperOperator}
+const ChoiStateSpace = OpSpace{<:AbstractChoiState}
+const KrausSpace = OpSpace{<:AbstractKraus}
+const StinespringSpace = OpSpace{<:AbstractStinespring}
 tensor(s1::OpSpace{T}, s2::OpSpace{T}) where T = OpSpace{T}(tensor(s1.sl,s2.sl), tensor(s1.sr, s2.sr))
 
 const QOSpace = Union{VecSpace, OpSpace}
@@ -105,15 +108,6 @@ const QOSpace = Union{VecSpace, OpSpace}
 # TensorSpace, SumSpace
 ##
 
-"""
-    CompositeBasis(b1, b2...)
-
-Basis for composite Hilbert spaces.
-
-Stores the subbases in a vector and creates the shape vector directly from the
-dimensions of these subbases. Instead of creating a CompositeBasis directly,
-`tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` should be used.
-"""
 struct TensorSpace <: Space
     spaces::Vector{Space}
 end
@@ -143,6 +137,32 @@ tensor(s1::TensorSpace, s2::Space) = TensorSpace([s1.spaces; s2])
 tensor(s1::Space, s2::TensorSpace) = TensorSpace([s1; s2.spaces])
 
 Base.:^(b::Space, N::Integer) = tensor_pow(b, N)
+
+"""
+    CompositeBasis(b1, b2...)
+
+Basis for composite Hilbert spaces.
+
+Stores the subbases in a vector and creates the shape vector directly from the
+dimensions of these subbases. Instead of creating a CompositeBasis directly,
+`tensor(b1, b2...)` or `b1 ⊗ b2 ⊗ …` should be used.
+"""
+
+"""
+struct CompositeBasis <: Basis
+    s::TensorSpace
+end
+Base.:(==)(s1::CompositeBasis, s2::CompositeBasis) = s1.s == s2.s
+Base.length(s::CompositeBasis) = length(s.s)
+Base.getindex(s::CompositeBasis, i) = s.s[i]
+shape(s::CompositeBasis) = shape(s.s)
+dimension(s::CompositeBasis) = dimension(s.s)
+tensor(s1::CompositeBasis, s2::CompositeBasis) = CompositeBasis(tensor(s1.s, s2.s))
+tensor(s1::CompositeBasis, s2::Space) = CompositeBasis(tensor(s1.s, s2))
+tensor(s1::Space, s2::CompositeBasis) = CompositeBasis(tensor(s1, s2.s))
+tensor(s1::Basis, s2::Basis) = CompositeBasis(TensorSpace([s1, s2]))
+"""
+
 
 """
     SumSpace(b1, b2...)
@@ -186,6 +206,28 @@ directsum(b1::Space, b2::SumSpace) = SumSpace([b1; b2.bases])
 directsum(bases::Space...) = reduce(directsum, bases)
 directsum(basis::Space) = basis
 
+
+"""
+    SumBasis(b1, b2...)
+
+Similar to [`CompositeBasis`](@ref) but for the [`directsum`](@ref) (⊕)
+"""
+
+"""
+struct SumBasis <: Basis
+    s::TensorSpace
+end
+Base.:(==)(s1::SumBasis, s2::SumBasis) = s1.s == s2.s
+Base.length(s::SumBasis) = length(s.s)
+Base.getindex(s::SumBasis, i) = s.s[i]
+shape(s::SumBasis) = shape(s.s)
+dimension(s::SumBasis) = dimension(s.s)
+directsum(s1::SumBasis, s2::SumBasis) = SumBasis(directsum(s1.s, s2.s))
+directsum(s1::SumBasis, s2::Space) = SumBasis(directsum(s1.s, s2))
+directsum(s1::Space, s2::SumBasis) = SumBasis(directsum(s1, s2.s))
+"""
+
+
 # TODO: what to do about embed for SumBasis?
 #embed(b::SumBasis, indices, ops) = embed(b, b, indices, ops)
 
@@ -196,42 +238,42 @@ directsum(basis::Space) = basis
 """
 Exception that should be raised for an illegal algebraic operation.
 """
-mutable struct IncompatibleSpaces <: Exception end
+mutable struct IncompatibleBases <: Exception end
 
-const SPACES_CHECK = Ref(true)
+const BASES_CHECK = Ref(true)
 
 """
-    @compatiblespaces
+    @compatiblebases
 
-Macro to skip checks for compatible spaces. Useful for `*`, `expect` and similar
+Macro to skip checks for compatible bases. Useful for `*`, `expect` and similar
 functions.
 """
-macro compatiblespaces(ex)
+macro compatiblebases(ex)
     return quote
-        SPACES_CHECK[] = false
+        BASES_CHECK[] = false
         local val = $(esc(ex))
-        SPACES_CHECK[] = true
+        BASES_CHECK[] = true
         val
     end
 end
 
 """
-    samespaces(a::Space, a::Space)
+    samebases(a::Space, a::Space)
 
-Test if two spaces are the same. Equivalant to `==`. See
-[`check_samespaces`](@ref).
+Test if two bases are the same. Equivalant to `==`. See
+[`check_samebases`](@ref).
 """
-samespaces(a::Space, b::Space) = a==b
+samebases(a::Space, b::Space) = a==b
 
 """
-    check_samespaces(a, b)
+    check_samebases(a, b)
 
-Throw an [`IncompatibleSpaces`](@ref) error if the spaces are not the same. See
-[`samespaces`](@ref).
+Throw an [`IncompatibleBases`](@ref) error if the bases are not the same. See
+[`samebases`](@ref).
 """
-function check_samespaces(a, b)
-    if SPACES_CHECK[] && !samespaces(a, b)
-        throw(IncompatibleSpaces())
+function check_samebases(a, b)
+    if BASES_CHECK[] && !samebases(a, b)
+        throw(IncompatibleBases())
     end
 end
 
@@ -251,8 +293,8 @@ determined by `addible(a, b)`.  Disabled by use of [`@compatiblespaces`](@ref)
 anywhere further up in the call stack.
 """
 function check_addible(a, b)
-    if SPACES_CHECK[] && !addible(a, b)
-        throw(IncompatibleSpaces())
+    if BASES_CHECK[] && !addible(a, b)
+        throw(IncompatibleBases())
     end
     add_space(a, b)
 end
@@ -262,6 +304,8 @@ end
 
 Check if any two quantum objects can be multiplied in the given order.
 """
+multiplicable(a::QObject, b::QObject) = multiplicable(space(a), space(b))
+
 multiplicable(a::Space, b::Space) = false
 
 multiplicable(a::CNumberSpace, b::CNumberSpace) = true
@@ -373,6 +417,24 @@ struct LabeledBasis <: Space
 end
 Base.:(==)(b1::LabeledBasis, b2::LabeledBasis) = b1.space == b2.space && b1.label == b2.label
 dimension(b::LabeledBasis) = dimension(b.space)
+
+"""
+    GenericBasis(N)
+
+A general purpose basis of dimension N.
+
+Should only be used rarely since it defeats the purpose of checking that the
+bases of state vectors and operators are correct for algebraic operations.
+The preferred way is to specify special bases for different systems.
+"""
+struct GenericBasis{S} <: Basis
+    shape::S
+end
+GenericBasis(N::Integer) = GenericBasis([N])
+
+Base.:(==)(b1::GenericBasis, b2::GenericBasis) = equal_shape(b1.shape, b2.shape)
+dimension(b::GenericBasis) = b.shape[1]
+
 
 """
     FockBasis(N,offset=0)
